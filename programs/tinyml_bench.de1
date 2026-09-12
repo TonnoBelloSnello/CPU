@@ -1,0 +1,203 @@
+const MMIO       = 0xFF00  # peripheral window base
+const CYCLES_LO  = MMIO + 0x0C  # free-running cycle counter, low half
+const INPUTS     = 64
+const CLASSES    = 10
+const WEIGHT_LEN = INPUTS * CLASSES
+const CHUNKS     = INPUTS / NPU_LANES
+const OUT_SHIFT  = 4  # keeps the accumulators below saturation
+
+space:
+    sample:   INPUTS
+    weights:  WEIGHT_LEN
+    out_s:    CLASSES
+    out_v:    CLASSES
+    out_e:    CLASSES
+    t_scalar: 2
+    t_vector: 2
+    t_engine: 2
+    verdict:  1
+
+main:
+    BL fill_data
+    BL time_scalar
+    BL time_vector
+    BL time_engine
+    BL check_and_classify
+    MOV LE, R0
+    MOV HEX, R1
+    B done
+
+fill_data:
+    MOV R1, =sample
+    MOV R2, V0
+fill_sample:
+    MUL R3, R2, V5
+    ADD R3, R3, V3
+    AND R3, R3, V15
+    SUB R3, R3, V8
+    SAVE R3, [R1]
+    ADD R1, R1, V1
+    ADD R2, R2, V1
+    CMP R2, V(INPUTS)
+    BNE fill_sample
+
+    MOV R1, =weights
+    MOV R2, V0
+fill_weight:
+    MUL R3, R2, V7
+    LSR R4, R2, V6
+    EOR R3, R3, R4
+    AND R3, R3, V15
+    SUB R3, R3, V8
+    SAVE R3, [R1]
+    ADD R1, R1, V1
+    ADD R2, R2, V1
+    CMP R2, V(WEIGHT_LEN)
+    BNE fill_weight
+    MOV PC, LR
+
+time_scalar:
+    PUSH LR
+    MOV R9, =CYCLES_LO
+    MOVM R10, [R9]
+    BL scalar_layer
+    MOVM R11, [R9]
+    SUB R11, R11, R10
+    SAVEM R11, [t_scalar]
+    POP PC
+
+time_vector:
+    PUSH LR
+    MOV R9, =CYCLES_LO
+    MOVM R10, [R9]
+    BL vector_layer
+    MOVM R11, [R9]
+    SUB R11, R11, R10
+    SAVEM R11, [t_vector]
+    POP PC
+
+time_engine:
+    PUSH LR
+    MOV R9, =CYCLES_LO
+    MOVM R10, [R9]
+    BL engine_layer
+    MOVM R11, [R9]
+    SUB R11, R11, R10
+    SAVEM R11, [t_engine]
+    POP PC
+
+scalar_layer:
+    MOV R1, =weights
+    MOV R8, =out_s
+    MOV R2, V0
+scalar_class:
+    MOV R3, V0
+    MOV R4, =sample
+    MOV R5, V0
+scalar_elem:
+    MOV R6, [R4]
+    SXTB R6, R6
+    MOV R7, [R1]
+    SXTB R7, R7
+    MADD R3, R6, R7
+    ADD R4, R4, V1
+    ADD R1, R1, V1
+    ADD R5, R5, V1
+    CMP R5, V(INPUTS)
+    BNE scalar_elem
+    RSHR R3, R3, V(OUT_SHIFT)
+    SSAT R3, R3, V8
+    SAVE R3, [R8]
+    ADD R8, R8, V1
+    ADD R2, R2, V1
+    CMP R2, V(CLASSES)
+    BNE scalar_class
+    MOV PC, LR
+
+vector_layer:
+    MOV R1, =weights
+    MOV R8, =out_v
+    MOV R2, V0
+vector_class:
+    ACLR A0
+    MOV R4, =sample
+    MOV R5, V0
+vector_chunk:
+    VLD Q0, [R4]
+    VLD Q1, [R1]
+    VDOT A0, Q0, Q1
+    ADD R4, R4, V(NPU_LANES)
+    ADD R1, R1, V(NPU_LANES)
+    ADD R5, R5, V1
+    CMP R5, V(CHUNKS)
+    BNE vector_chunk
+    ARSHR A0, V(OUT_SHIFT)
+    AGETS R3, A0
+    SSAT R3, R3, V8
+    SAVE R3, [R8]
+    ADD R8, R8, V1
+    ADD R2, R2, V1
+    CMP R2, V(CLASSES)
+    BNE vector_class
+    MOV PC, LR
+
+engine_layer:
+    NPUCFG MODE, V(NPU_CONV)
+    NPUCFG FLAGS, V(NPU_NO_BIAS)
+    MOV R0, =sample
+    NPUCFG IN_BASE, R0
+    NPUCFG IN_W, V1
+    NPUCFG IN_H, V1
+    NPUCFG IN_C, V(INPUTS)
+    MOV R0, =weights
+    NPUCFG W_BASE, R0
+    MOV R0, =out_e
+    NPUCFG OUT_BASE, R0
+    NPUCFG OUT_W, V1
+    NPUCFG OUT_H, V1
+    NPUCFG OUT_C, V(CLASSES)
+    NPUCFG K_W, V1
+    NPUCFG K_H, V1
+    NPUCFG STRIDE, V(0x0101)
+    NPUCFG PAD, V0
+    NPUCFG IN_ZP, V0
+    NPUCFG OUT_ZP, V0
+    NPUCFG MULT, V0
+    NPUCFG SHIFT, V(OUT_SHIFT)
+    NPUCFG ACT_MIN, V0
+    NPUCFG ACT_MAX, V0
+    NPURUN R1
+    MOV PC, LR
+
+check_and_classify:
+    NPUCFG MODE, V(NPU_ARGMAX)
+    MOV R0, =out_e
+    NPUCFG IN_BASE, R0
+    NPUCFG OUT_W, V1
+    NPUCFG OUT_H, V1
+    NPUCFG OUT_C, V(CLASSES)
+    NPURUN R1
+
+    MOV R2, =out_s
+    MOV R3, =out_v
+    MOV R4, =out_e
+    MOV R5, V0
+    MOV R0, V1
+compare_loop:
+    MOV R6, [R2]
+    MOV R7, [R3]
+    CMP R6, R7
+    MOVNE R0, V0
+    MOV R8, [R4]
+    CMP R6, R8
+    MOVNE R0, V0
+    ADD R2, R2, V1
+    ADD R3, R3, V1
+    ADD R4, R4, V1
+    ADD R5, R5, V1
+    CMP R5, V(CLASSES)
+    BNE compare_loop
+    SAVE R0, [verdict]
+    MOV PC, LR
+
+done:

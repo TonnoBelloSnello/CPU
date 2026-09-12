@@ -1,0 +1,105 @@
+[project]
+name = "cpu"
+version = "0.1.0"
+description = "ARM-like 16-bit SystemVerilog CPU with a Python assembler, simulation harness and quantized-inference extensions"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi>=0.128.0",
+    "numpy>=2.5.3",
+    "pytest>=9.0.2",
+    "pytest-xdist>=3.8.0",
+    # scripts/ml is torch throughout, the integer reference the tests compare
+    # the CPU against included, so it is no longer a training-only dependency.
+    "torch>=2.6",
+    "uvicorn>=0.30.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/cpu"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+
+
+[dependency-groups]
+dev = [
+    "ruff>=0.15",
+    "ty>=0.0.1a26",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = [
+    "F",      # pyflakes
+    "E", "W", # pycodestyle
+    "I",      # import sorting
+    "UP",     # pyupgrade
+    "B",      # bugbear
+    "C4",     # comprehensions
+    "SIM",    # simplify
+    "RET",    # return statements
+    "PERF",   # performance
+    "FURB",   # modernization
+    "PIE",    # misc lints
+    "PLC", "PLE", "PLR1", "PLW",
+    "RUF",
+    "ERA",    # commented-out code
+    "ANN",    # every signature is annotated
+    "ARG",    # unused arguments
+    "A",      # builtin shadowing
+    "DTZ",    # naive datetimes
+    "G", "LOG",  # logging call shape
+    "ISC",    # implicit string concatenation
+    "N",      # naming
+    "PT",     # pytest style
+    "PTH",    # pathlib over os.path
+    "RSE",    # raise
+    "SLF",    # private member access
+    "T20",    # print outside a CLI entry point
+]
+ignore = [
+    "FURB166", # "VB1010" is an assembly literal, not a Python 0b prefix
+    "PLC0415", # deferred imports break real cycles here and are commented
+    "PLW2901", # rebinding the loop variable is idiomatic in the line scanners
+    "RUF005",  # explicit concatenation reads better than unpacking here
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = [
+    "E402",
+    "E501",
+    "SLF001",  # the suite pins internal helpers on purpose
+]
+# Markup held in string literals: inline SVG here, generated SystemVerilog there.
+# Wrapping either would change or obscure what the file actually emits.
+"scripts/perf/track_test_performance.py" = ["E501", "T20"]
+"src/cpu/simulation/templates.py" = ["E501"]
+# The CLI entry points and the operator scripts are the only things that print;
+# everything else under src/ logs, so a stray print there is a real defect.
+"src/cpu/encoder/main.py" = ["T20"]
+"src/cpu/encoder/analyze.py" = ["T20"]
+"src/cpu/encoder/utils/bin2hex.py" = ["T20"]
+"src/cpu/encoder/utils/hex_to_mif.py" = ["T20"]
+"scripts/board/jtag_keys.py" = ["T20"]
+"scripts/ml/tinyml_export.py" = ["T20"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["src"]
+
+[tool.ty.environment]
+python = ".venv"
+
+# Only torch comes from here: an unscoped index would become the default one
+# and pull its pinned copies of shared packages.
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cpu" }

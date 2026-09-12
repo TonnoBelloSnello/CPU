@@ -1,0 +1,13 @@
+{
+  "name": "cpu-web-ui",
+  "private": true,
+  "description": "Styles for the CPU simulator UI served by src/cpu/web/app.py.",
+  "scripts": {
+    "build:css": "tailwindcss -i styles/app.css -o static/styles.css --minify",
+    "watch:css": "tailwindcss -i styles/app.css -o static/styles.css --watch"
+  },
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.3.3",
+    "tailwindcss": "^4.3.3"
+  }
+}

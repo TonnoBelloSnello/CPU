@@ -1,0 +1,237 @@
+
+@import "tailwindcss" source(none);
+
+@source "../static/index.html";
+@source "../static/app.js";
+
+@theme {
+  --color-*: initial;
+  --color-transparent: transparent;
+  --color-current: currentColor;
+  --color-black: #000000;
+
+  --color-bg: #0b0d10;
+  --color-surface: #12151a;
+  --color-raised: #171b22;
+  --color-raised-hover: #1e242c;
+  --color-raised-active: #10141a;
+  --color-line: #242b35;
+  --color-line-soft: #1a2029;
+  --color-line-strong: #313a46;
+
+  --color-ink: #e6e9ee;       
+  --color-ink-dim: #a8b0bc; 
+  --color-ink-faint: #78818f; 
+  --color-ink-inverse: #16120a;
+
+  --color-accent: #e8a33d;
+  --color-accent-hover: #f2b055;
+  --color-accent-active: #d9932e;
+
+  --color-led: #ff4526;
+  --color-led-off: #2b1310;
+  --color-led-rim: #3a1c18;
+  --color-seg-off: #241416;
+  --color-danger: #ff7a6b;
+
+  --color-editor: #0d1014;
+  --color-digit: #0d0f13;
+  --color-scrollbar: #2c343f;
+  --color-scrollbar-hover: #3a4553;
+
+  --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "Cascadia Mono", "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  --default-font-family: var(--font-ui);
+  --default-mono-font-family: var(--font-mono);
+
+  --text-*: initial;
+  --text-micro: 10px;
+  --text-mini: 11px;
+  --text-small: 12px;
+  --text-ui: 13px;
+  --text-code: 14px;
+  --text-title: 16px;
+
+  --radius-*: initial;
+  --radius-panel: 3px;
+  --radius-thumb: 6px;
+
+  --shadow-*: initial;
+  --shadow-led: 0 0 8px 2px rgb(255 69 38 / 0.4);
+}
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+
+  body {
+    @apply bg-bg text-ink;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  :where(a, button, select, textarea, [tabindex]):focus-visible {
+    @apply outline-2 outline-offset-2 outline-accent;
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-scrollbar) transparent;
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply rounded-thumb border-[3px] border-bg bg-scrollbar;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-scrollbar-hover;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      transition-duration: 0.01ms !important;
+      animation-duration: 0.01ms !important;
+    }
+  }
+}
+
+
+@layer components {
+  .panel {
+    @apply relative shrink-0 rounded-panel border border-line-soft bg-surface;
+  }
+
+  .panel-fill {
+    @apply flex min-h-0 flex-1 flex-col;
+  }
+
+  .panel-head {
+    @apply flex items-center justify-between gap-3 border-b border-line-soft px-3 py-2;
+  }
+
+  .panel-title {
+    @apply text-ui font-semibold text-ink;
+  }
+
+  .panel-body {
+    @apply p-3;
+  }
+
+  .panel-note {
+    @apply mt-2 text-small text-ink-faint;
+  }
+
+  .readout {
+    @apply font-mono text-small tabular-nums whitespace-nowrap text-ink-dim;
+  }
+
+  .status {
+    @apply min-h-6 text-small text-ink-dim;
+  }
+
+  .status.is-error {
+    @apply text-danger;
+  }
+
+  .btn {
+    @apply cursor-pointer rounded-panel border border-line bg-raised px-3 py-[5px] text-ui
+           transition-colors duration-100 hover:border-line-strong hover:bg-raised-hover
+           active:bg-raised-active;
+  }
+
+  .btn-primary {
+    @apply border-accent bg-accent px-[18px] font-semibold text-ink-inverse
+           hover:border-accent-hover hover:bg-accent-hover active:bg-accent-active;
+  }
+
+  .select {
+    @apply rounded-panel border border-line bg-raised px-2 py-1 text-ui
+           disabled:cursor-not-allowed disabled:text-ink-faint;
+  }
+
+  .key {
+    @apply py-1.5 font-mono text-small;
+  }
+
+  .key[aria-pressed="true"] {
+    @apply border-accent bg-accent text-ink-inverse;
+  }
+
+  .bit {
+    @apply flex flex-col items-center gap-1;
+  }
+
+  .bit-label {
+    @apply font-mono text-micro text-ink-faint;
+  }
+
+  .led {
+    @apply size-5 rounded-full border border-led-rim bg-led-off;
+  }
+
+  .led-on {
+    @apply border-led bg-led shadow-led;
+  }
+
+  .digit-cell {
+    @apply flex h-13 w-[34px] items-center justify-center rounded-panel border border-line bg-digit;
+  }
+
+  .seg {
+    @apply fill-seg-off;
+  }
+
+  .seg-on {
+    @apply fill-led;
+  }
+
+  .data-table {
+    @apply w-full font-mono text-small tabular-nums slashed-zero;
+  }
+
+  .data-table th {
+    @apply sticky top-0 border-b border-line bg-surface px-3 py-2 text-right
+           text-mini font-medium text-ink-faint;
+  }
+
+  .data-table td {
+    @apply border-b border-line-soft px-3 py-[3px] text-right text-ink;
+  }
+
+  .data-table th:first-child,
+  .data-table td:first-child {
+    @apply text-left;
+  }
+
+  .data-table td:first-child {
+    @apply text-ink-dim;
+  }
+
+  .data-table tr:last-child td {
+    @apply border-b-0;
+  }
+
+  .data-table .is-empty {
+    @apply p-3 text-left text-ink-faint;
+  }
+
+  .chip {
+    @apply rounded-panel border border-line bg-raised px-2 py-0.5 font-mono
+           text-mini text-ink-dim;
+  }
+
+  .chip-value {
+    @apply text-ink;
+  }
+
+  .empty-state {
+    @apply text-small text-ink-faint;
+  }
+}

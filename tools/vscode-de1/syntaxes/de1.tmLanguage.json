@@ -1,0 +1,177 @@
+{
+  "scopeName": "source.de1",
+  "name": "DE1 Assembly",
+  "patterns": [
+    {
+      "include": "#comments"
+    },
+    {
+      "include": "#directives"
+    },
+    {
+      "include": "#sections"
+    },
+    {
+      "include": "#labels"
+    },
+    {
+      "include": "#variable-definitions"
+    },
+    {
+      "include": "#instructions"
+    },
+    {
+      "include": "#registers"
+    },
+    {
+      "include": "#immediates"
+    },
+    {
+      "include": "#strings"
+    },
+    {
+      "include": "#memory"
+    },
+    {
+      "include": "#matrices"
+    }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.number-sign.de1",
+          "match": "#.*$"
+        }
+      ]
+    },
+    "directives": {
+      "patterns": [
+        {
+          "match": "(?i)^\\s*(const)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*(=)",
+          "captures": {
+            "1": {
+              "name": "keyword.control.directive.de1"
+            },
+            "2": {
+              "name": "variable.other.constant.de1"
+            },
+            "3": {
+              "name": "keyword.operator.assignment.de1"
+            }
+          }
+        },
+        {
+          "name": "keyword.control.directive.de1",
+          "match": "(?i)^\\s*include\\b"
+        }
+      ]
+    },
+    "sections": {
+      "patterns": [
+        {
+          "name": "entity.name.section.de1",
+          "match": "^\\s*(space|main)(?=\\s*:)"
+        },
+        {
+          "name": "punctuation.separator.section.de1",
+          "match": "^\\s*(?:space|main)\\s*(:)"
+        }
+      ]
+    },
+    "labels": {
+      "patterns": [
+        {
+          "name": "entity.name.label.de1",
+          "match": "^\\s*([A-Za-z_][A-Za-z0-9_]*)(?=\\s*:)"
+        },
+        {
+          "name": "punctuation.separator.label.de1",
+          "match": "^\\s*[A-Za-z_][A-Za-z0-9_]*\\s*(:)"
+        }
+      ]
+    },
+    "variable-definitions": {
+      "patterns": [
+        {
+          "name": "variable.other.definition.de1",
+          "match": "^\\s*([A-Za-z_][A-Za-z0-9_]*)(?=\\s*(?:=|:))"
+        }
+      ]
+    },
+    "instructions": {
+      "patterns": [
+        {
+          "name": "keyword.control.instruction.de1",
+          "match": "(?i)\\b(?:QADD|QSUB|SSAT|USAT|QRDMULH|RSHR|RELU|SXTB|VLD|VST|VDOT|VSUM|VMAXR|VDUP|VEXT|VINS|ACLR|ASET|AGETS|AGET|AQMUL|ARSHR|NPUCFG|NPURUN|AND|EOR|SUB|RSB|ADD|MUL|DIV|ADC|SBC|RSC|TST|TEQ|CMP|CMN|ORR|SAVEM|MOVM|SAVE|MOV|BIC|MVN|PUSH|POP|WAIT|WAITK|PIXEL|FADD|FSUB|FMUL|FDIV|FCMP|FMOV|TEXT|B|BL|ABS|MAX|MIN|MADD|PIXELNB|WAITKNB|LSL|LSR|ASR|ROR)(?:S)?(?:EQ|NE|CS|CC|MI|PL|VS|VC|HI|LS|GE|LT|GT|LE|AL|NV)?\\b"
+        }
+      ]
+    },
+    "registers": {
+      "patterns": [
+        {
+          "name": "variable.language.register.de1",
+          "match": "(?i)\\b(?:R(?:1[0-5]|[0-9])|Q[0-7]|A[0-3]|SP|LR|PC|LE|HEX)\\b"
+        }
+      ]
+    },
+    "immediates": {
+      "patterns": [
+        {
+          "name": "constant.numeric.binary.de1",
+          "match": "(?i)\\bVB[01]+\\b"
+        },
+        {
+          "name": "constant.numeric.decimal.de1",
+          "match": "(?i)\\bV-?\\d+\\b"
+        },
+        {
+          "name": "constant.numeric.float.de1",
+          "match": "(?i)\\bF(?:[-+]?(?:\\d+(?:\\.\\d*)?|\\.\\d+)(?:[eE][-+]?\\d+)?|[-+]?(?:INF|NAN))\\b"
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.de1",
+          "begin": "\"",
+          "end": "\"",
+          "patterns": [
+            {
+              "name": "constant.character.escape.de1",
+              "match": "\\\\."
+            }
+          ]
+        },
+        {
+          "name": "string.quoted.single.de1",
+          "begin": "'",
+          "end": "'",
+          "patterns": [
+            {
+              "name": "constant.character.escape.de1",
+              "match": "\\\\."
+            }
+          ]
+        }
+      ]
+    },
+    "memory": {
+      "patterns": [
+        {
+          "name": "meta.brackets.memory.de1",
+          "match": "\\[[^\\]]+\\]"
+        }
+      ]
+    },
+    "matrices": {
+      "patterns": [
+        {
+          "name": "meta.matrix.literal.de1",
+          "match": "\\{\\{[^\\n]+\\}\\}"
+        }
+      ]
+    }
+  }
+}

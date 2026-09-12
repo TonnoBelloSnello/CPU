@@ -1,0 +1,262 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="696" viewBox="0 0 920 696">
+<style>
+text { font-family: Segoe UI, Arial, sans-serif; fill: #111827; }
+.muted { fill: #6b7280; font-size: 12px; }
+.axis { stroke: #9ca3af; stroke-width: 1; }
+.grid { stroke: #e5e7eb; stroke-width: 1; }
+.series { fill: none; stroke-width: 2.5; }
+.dot { stroke: white; stroke-width: 1.5; }
+</style>
+<rect width="100%" height="100%" fill="#ffffff"/>
+<text x="78" y="28" font-size="20" font-weight="700">CPU performance history</text>
+<text x="78" y="47" class="muted">Normalized net cycles, first recorded run = 100%. Lower is faster.</text>
+<line x1="78" y1="410" x2="690" y2="410" class="axis"/>
+<line x1="78" y1="58" x2="78" y2="410" class="axis"/>
+<line x1="78" y1="410.0" x2="690" y2="410.0" class="grid"/>
+<text x="68" y="414.0" text-anchor="end" class="muted">17.0%</text>
+<line x1="78" y1="339.6" x2="690" y2="339.6" class="grid"/>
+<text x="68" y="343.6" text-anchor="end" class="muted">36.3%</text>
+<line x1="78" y1="269.2" x2="690" y2="269.2" class="grid"/>
+<text x="68" y="273.2" text-anchor="end" class="muted">55.7%</text>
+<line x1="78" y1="198.8" x2="690" y2="198.8" class="grid"/>
+<text x="68" y="202.8" text-anchor="end" class="muted">75.1%</text>
+<line x1="78" y1="128.4" x2="690" y2="128.4" class="grid"/>
+<text x="68" y="132.4" text-anchor="end" class="muted">94.5%</text>
+<line x1="78" y1="58.0" x2="690" y2="58.0" class="grid"/>
+<text x="68" y="62.0" text-anchor="end" class="muted">113.8%</text>
+<line x1="78.0" y1="410" x2="78.0" y2="415" class="axis"/>
+<text x="78.0" y="432" text-anchor="middle" class="muted">1</text>
+<title>Run 1: 2026-08-11 19:25:20</title>
+<line x1="180.0" y1="410" x2="180.0" y2="415" class="axis"/>
+<text x="180.0" y="432" text-anchor="middle" class="muted">2</text>
+<title>Run 2: baseline: radix-2 divider, 32-bit numerator</title>
+<line x1="282.0" y1="410" x2="282.0" y2="415" class="axis"/>
+<text x="282.0" y="432" text-anchor="middle" class="muted">3</text>
+<title>Run 3: radix-4 divider + leading-zero skip</title>
+<line x1="384.0" y1="410" x2="384.0" y2="415" class="axis"/>
+<text x="384.0" y="432" text-anchor="middle" class="muted">4</text>
+<title>Run 4: fp16 normaliser: LZC + barrel shift, FP_SETTLE_CYCLES 3-&gt;1</title>
+<line x1="486.0" y1="410" x2="486.0" y2="415" class="axis"/>
+<text x="486.0" y="432" text-anchor="middle" class="muted">5</text>
+<title>Run 5: 2026-08-12 17:06:39</title>
+<line x1="588.0" y1="410" x2="588.0" y2="415" class="axis"/>
+<text x="588.0" y="432" text-anchor="middle" class="muted">6</text>
+<title>Run 6: 2026-08-12 17:41:50</title>
+<line x1="690.0" y1="410" x2="690.0" y2="415" class="axis"/>
+<text x="690.0" y="432" text-anchor="middle" class="muted">7</text>
+<title>Run 7: 2026-08-14 13:27:27</title>
+<line x1="714" y1="58" x2="732" y2="58" stroke="#2563eb" stroke-width="3"/>
+<text x="739" y="62" class="muted">Factorial 8!</text>
+<line x1="714" y1="80" x2="732" y2="80" stroke="#dc2626" stroke-width="3"/>
+<text x="739" y="84" class="muted">FP literal loop</text>
+<line x1="714" y1="102" x2="732" y2="102" stroke="#16a34a" stroke-width="3"/>
+<text x="739" y="106" class="muted">FP register loop</text>
+<line x1="714" y1="124" x2="732" y2="124" stroke="#9333ea" stroke-width="3"/>
+<text x="739" y="128" class="muted">Matrix 2x4 x 4x2</text>
+<line x1="714" y1="146" x2="732" y2="146" stroke="#ea580c" stroke-width="3"/>
+<text x="739" y="150" class="muted">MOV loop</text>
+<line x1="714" y1="168" x2="732" y2="168" stroke="#0891b2" stroke-width="3"/>
+<text x="739" y="172" class="muted">MUL loop</text>
+<line x1="714" y1="190" x2="732" y2="190" stroke="#be123c" stroke-width="3"/>
+<text x="739" y="194" class="muted">FDIV loop</text>
+<line x1="714" y1="212" x2="732" y2="212" stroke="#4d7c0f" stroke-width="3"/>
+<text x="739" y="216" class="muted">Integer DIV loop</text>
+<polyline points="78.0,108.3 180.0,108.3 282.0,108.3 384.0,108.3 486.0,108.3 588.0,108.3 690.0,123.4" class="series" stroke="#2563eb"/>
+<circle cx="78.0" cy="108.3" r="4.5" class="dot" fill="#2563eb">
+<title>Factorial 8! | 2026-08-11 19:25:20 | 48 cycles | 100.00% of baseline</title>
+</circle>
+<circle cx="180.0" cy="108.3" r="4.5" class="dot" fill="#2563eb">
+<title>Factorial 8! | baseline: radix-2 divider, 32-bit numerator | 48 cycles | 100.00% of baseline</title>
+</circle>
+<circle cx="282.0" cy="108.3" r="4.5" class="dot" fill="#2563eb">
+<title>Factorial 8! | radix-4 divider + leading-zero skip | 48 cycles | 100.00% of baseline</title>
+</circle>
+<circle cx="384.0" cy="108.3" r="4.5" class="dot" fill="#2563eb">
+<title>Factorial 8! | fp16 normaliser: LZC + barrel shift, FP_SETTLE_CYCLES 3-&gt;1 | 48 cycles | 100.00% of baseline</title>
+</circle>
+<circle cx="486.0" cy="108.3" r="4.5" class="dot" fill="#2563eb">
+<title>Factorial 8! | 2026-08-12 17:06:39 | 48 cycles | 100.00% of baseline</title>
+</circle>
+<circle cx="588.0" cy="108.3" r="4.5" class="dot" fill="#2563eb">
+<title>Factorial 8! | 2026-08-12 17:41:50 | 48 cycles | 100.00% of baseline</title>
+</circle>
+<circle cx="690.0" cy="123.4" r="4.5" class="dot" fill="#2563eb">
+<title>Factorial 8! | 2026-08-14 13:27:27 | 46 cycles | 95.83% of baseline</title>
+</circle>
+<polyline points="78.0,108.3 180.0,108.3 282.0,108.3 384.0,198.8 486.0,198.8 588.0,198.8 690.0,289.5" class="series" stroke="#dc2626"/>
+<circle cx="78.0" cy="108.3" r="4.5" class="dot" fill="#dc2626">
+<title>FP literal loop | 2026-08-11 19:25:20 | 2900 cycles | 100.00% of baseline</title>
+</circle>
+<circle cx="180.0" cy="108.3" r="4.5" class="dot" fill="#dc2626">
+<title>FP literal loop | baseline: radix-2 divider, 32-bit numerator | 2900 cycles | 100.00% of baseline</title>
+</circle>
+<circle cx="282.0" cy="108.3" r="4.5" class="dot" fill="#dc2626">
+<title>FP literal loop | radix-4 divider + leading-zero skip | 2900 cycles | 100.00% of baseline</title>
+</circle>
+<circle cx="384.0" cy="198.8" r="4.5" class="dot" fill="#dc2626">
+<title>FP literal loop | fp16 normaliser: LZC + barrel shift, FP_SETTLE_CYCLES 3-&gt;1 | 2178 cycles | 75.10% of baseline</title>
+</circle>
+<circle cx="486.0" cy="198.8" r="4.5" class="dot" fill="#dc2626">
+<title>FP literal loop | 2026-08-12 17:06:39 | 2178 cycles | 75.10% of baseline</title>
+</circle>
+<circle cx="588.0" cy="198.8" r="4.5" class="dot" fill="#dc2626">
+<title>FP literal loop | 2026-08-12 17:41:50 | 2178 cycles | 75.10% of baseline</title>
+</circle>
+<circle cx="690.0" cy="289.5" r="4.5" class="dot" fill="#dc2626">
+<title>FP literal loop | 2026-08-14 13:27:27 | 1454 cycles | 50.14% of baseline</title>
+</circle>
+<polyline points="78.0,108.3 180.0,108.3 282.0,108.3 384.0,199.0 486.0,199.0 588.0,199.0 690.0,289.8" class="series" stroke="#16a34a"/>
+<circle cx="78.0" cy="108.3" r="4.5" class="dot" fill="#16a34a">
+<title>FP register loop | 2026-08-11 19:25:20 | 4832 cycles | 100.00% of baseline</title>
+</circle>
+<circle cx="180.0" cy="108.3" r="4.5" class="dot" fill="#16a34a">
+<title>FP register loop | baseline: radix-2 divider, 32-bit numerator | 4832 cycles | 100.00% of baseline</title>
+</circle>
+<circle cx="282.0" cy="108.3" r="4.5" class="dot" fill="#16a34a">
+<title>FP register loop | radix-4 divider + leading-zero skip | 4832 cycles | 100.00% of baseline</title>
+</circle>
+<circle cx="384.0" cy="199.0" r="4.5" class="dot" fill="#16a34a">
+<title>FP register loop | fp16 normaliser: LZC + barrel shift, FP_SETTLE_CYCLES 3-&gt;1 | 3626 cycles | 75.04% of baseline</title>
+</circle>
+<circle cx="486.0" cy="199.0" r="4.5" class="dot" fill="#16a34a">
+<title>FP register loop | 2026-08-12 17:06:39 | 3626 cycles | 75.04% of baseline</title>
+</circle>
+<circle cx="588.0" cy="199.0" r="4.5" class="dot" fill="#16a34a">
+<title>FP register loop | 2026-08-12 17:41:50 | 3626 cycles | 75.04% of baseline</title>
+</circle>
+<circle cx="690.0" cy="289.8" r="4.5" class="dot" fill="#16a34a">
+<title>FP register loop | 2026-08-14 13:27:27 | 2418 cycles | 50.04% of baseline</title>
+</circle>
+<polyline points="78.0,108.3 180.0,108.3 282.0,108.3 384.0,108.3 486.0,108.3 588.0,108.3 690.0,122.3" class="series" stroke="#9333ea"/>
+<circle cx="78.0" cy="108.3" r="4.5" class="dot" fill="#9333ea">
+<title>Matrix 2x4 x 4x2 | 2026-08-11 19:25:20 | 52 cycles | 100.00% of baseline</title>
+</circle>
+<circle cx="180.0" cy="108.3" r="4.5" class="dot" fill="#9333ea">
+<title>Matrix 2x4 x 4x2 | baseline: radix-2 divider, 32-bit numerator | 52 cycles | 100.00% of baseline</title>
+</circle>
+<circle cx="282.0" cy="108.3" r="4.5" class="dot" fill="#9333ea">
+<title>Matrix 2x4 x 4x2 | radix-4 divider + leading-zero skip | 52 cycles | 100.00% of baseline</title>
+</circle>
+<circle cx="384.0" cy="108.3" r="4.5" class="dot" fill="#9333ea">
+<title>Matrix 2x4 x 4x2 | fp16 normaliser: LZC + barrel shift, FP_SETTLE_CYCLES 3-&gt;1 | 52 cycles | 100.00% of baseline</title>
+</circle>
+<circle cx="486.0" cy="108.3" r="4.5" class="dot" fill="#9333ea">
+<title>Matrix 2x4 x 4x2 | 2026-08-12 17:06:39 | 52 cycles | 100.00% of baseline</title>
+</circle>
+<circle cx="588.0" cy="108.3" r="4.5" class="dot" fill="#9333ea">
+<title>Matrix 2x4 x 4x2 | 2026-08-12 17:41:50 | 52 cycles | 100.00% of baseline</title>
+</circle>
+<circle cx="690.0" cy="122.3" r="4.5" class="dot" fill="#9333ea">
+<title>Matrix 2x4 x 4x2 | 2026-08-14 13:27:27 | 50 cycles | 96.15% of baseline</title>
+</circle>
+<polyline points="78.0,108.3 180.0,108.3 282.0,108.3 384.0,108.3 486.0,108.3 588.0,108.3 690.0,109.0" class="series" stroke="#ea580c"/>
+<circle cx="78.0" cy="108.3" r="4.5" class="dot" fill="#ea580c">
+<title>MOV loop | 2026-08-11 19:25:20 | 1006 cycles | 100.00% of baseline</title>
+</circle>
+<circle cx="180.0" cy="108.3" r="4.5" class="dot" fill="#ea580c">
+<title>MOV loop | baseline: radix-2 divider, 32-bit numerator | 1006 cycles | 100.00% of baseline</title>
+</circle>
+<circle cx="282.0" cy="108.3" r="4.5" class="dot" fill="#ea580c">
+<title>MOV loop | radix-4 divider + leading-zero skip | 1006 cycles | 100.00% of baseline</title>
+</circle>
+<circle cx="384.0" cy="108.3" r="4.5" class="dot" fill="#ea580c">
+<title>MOV loop | fp16 normaliser: LZC + barrel shift, FP_SETTLE_CYCLES 3-&gt;1 | 1006 cycles | 100.00% of baseline</title>
+</circle>
+<circle cx="486.0" cy="108.3" r="4.5" class="dot" fill="#ea580c">
+<title>MOV loop | 2026-08-12 17:06:39 | 1006 cycles | 100.00% of baseline</title>
+</circle>
+<circle cx="588.0" cy="108.3" r="4.5" class="dot" fill="#ea580c">
+<title>MOV loop | 2026-08-12 17:41:50 | 1006 cycles | 100.00% of baseline</title>
+</circle>
+<circle cx="690.0" cy="109.0" r="4.5" class="dot" fill="#ea580c">
+<title>MOV loop | 2026-08-14 13:27:27 | 1004 cycles | 99.80% of baseline</title>
+</circle>
+<polyline points="78.0,108.3 180.0,108.3 282.0,108.3 384.0,108.3 486.0,108.3 588.0,108.3 690.0,109.0" class="series" stroke="#0891b2"/>
+<circle cx="78.0" cy="108.3" r="4.5" class="dot" fill="#0891b2">
+<title>MUL loop | 2026-08-11 19:25:20 | 1006 cycles | 100.00% of baseline</title>
+</circle>
+<circle cx="180.0" cy="108.3" r="4.5" class="dot" fill="#0891b2">
+<title>MUL loop | baseline: radix-2 divider, 32-bit numerator | 1006 cycles | 100.00% of baseline</title>
+</circle>
+<circle cx="282.0" cy="108.3" r="4.5" class="dot" fill="#0891b2">
+<title>MUL loop | radix-4 divider + leading-zero skip | 1006 cycles | 100.00% of baseline</title>
+</circle>
+<circle cx="384.0" cy="108.3" r="4.5" class="dot" fill="#0891b2">
+<title>MUL loop | fp16 normaliser: LZC + barrel shift, FP_SETTLE_CYCLES 3-&gt;1 | 1006 cycles | 100.00% of baseline</title>
+</circle>
+<circle cx="486.0" cy="108.3" r="4.5" class="dot" fill="#0891b2">
+<title>MUL loop | 2026-08-12 17:06:39 | 1006 cycles | 100.00% of baseline</title>
+</circle>
+<circle cx="588.0" cy="108.3" r="4.5" class="dot" fill="#0891b2">
+<title>MUL loop | 2026-08-12 17:41:50 | 1006 cycles | 100.00% of baseline</title>
+</circle>
+<circle cx="690.0" cy="109.0" r="4.5" class="dot" fill="#0891b2">
+<title>MUL loop | 2026-08-14 13:27:27 | 1004 cycles | 99.80% of baseline</title>
+</circle>
+<polyline points="180.0,108.3 282.0,261.4 384.0,278.7 486.0,278.7 588.0,278.7 690.0,287.6" class="series" stroke="#be123c"/>
+<circle cx="180.0" cy="108.3" r="4.5" class="dot" fill="#be123c">
+<title>FDIV loop | baseline: radix-2 divider, 32-bit numerator | 5126 cycles | 100.00% of baseline</title>
+</circle>
+<circle cx="282.0" cy="261.4" r="4.5" class="dot" fill="#be123c">
+<title>FDIV loop | radix-4 divider + leading-zero skip | 2966 cycles | 57.86% of baseline</title>
+</circle>
+<circle cx="384.0" cy="278.7" r="4.5" class="dot" fill="#be123c">
+<title>FDIV loop | fp16 normaliser: LZC + barrel shift, FP_SETTLE_CYCLES 3-&gt;1 | 2722 cycles | 53.10% of baseline</title>
+</circle>
+<circle cx="486.0" cy="278.7" r="4.5" class="dot" fill="#be123c">
+<title>FDIV loop | 2026-08-12 17:06:39 | 2722 cycles | 53.10% of baseline</title>
+</circle>
+<circle cx="588.0" cy="278.7" r="4.5" class="dot" fill="#be123c">
+<title>FDIV loop | 2026-08-12 17:41:50 | 2722 cycles | 53.10% of baseline</title>
+</circle>
+<circle cx="690.0" cy="287.6" r="4.5" class="dot" fill="#be123c">
+<title>FDIV loop | 2026-08-14 13:27:27 | 2596 cycles | 50.64% of baseline</title>
+</circle>
+<polyline points="180.0,108.3 282.0,359.6 384.0,359.6 486.0,359.6 588.0,359.6 690.0,359.7" class="series" stroke="#4d7c0f"/>
+<circle cx="180.0" cy="108.3" r="4.5" class="dot" fill="#4d7c0f">
+<title>Integer DIV loop | baseline: radix-2 divider, 32-bit numerator | 4512 cycles | 100.00% of baseline</title>
+</circle>
+<circle cx="282.0" cy="359.6" r="4.5" class="dot" fill="#4d7c0f">
+<title>Integer DIV loop | radix-4 divider + leading-zero skip | 1392 cycles | 30.85% of baseline</title>
+</circle>
+<circle cx="384.0" cy="359.6" r="4.5" class="dot" fill="#4d7c0f">
+<title>Integer DIV loop | fp16 normaliser: LZC + barrel shift, FP_SETTLE_CYCLES 3-&gt;1 | 1392 cycles | 30.85% of baseline</title>
+</circle>
+<circle cx="486.0" cy="359.6" r="4.5" class="dot" fill="#4d7c0f">
+<title>Integer DIV loop | 2026-08-12 17:06:39 | 1392 cycles | 30.85% of baseline</title>
+</circle>
+<circle cx="588.0" cy="359.6" r="4.5" class="dot" fill="#4d7c0f">
+<title>Integer DIV loop | 2026-08-12 17:41:50 | 1392 cycles | 30.85% of baseline</title>
+</circle>
+<circle cx="690.0" cy="359.7" r="4.5" class="dot" fill="#4d7c0f">
+<title>Integer DIV loop | 2026-08-14 13:27:27 | 1390 cycles | 30.81% of baseline</title>
+</circle>
+<text x="78" y="472" font-size="14" font-weight="700">Latest run vs first recorded run</text>
+<text x="78" y="494" class="muted">Benchmark</text>
+<text x="358" y="494" class="muted">Latest cycles</text>
+<text x="498" y="494" class="muted">Improvement</text>
+<text x="78" y="516" class="muted">Factorial 8!</text>
+<text x="358" y="516" class="muted">46</text>
+<text x="498" y="516" fill="#15803d" font-size="12">+4.17%</text>
+<text x="78" y="538" class="muted">FP literal loop</text>
+<text x="358" y="538" class="muted">1454</text>
+<text x="498" y="538" fill="#15803d" font-size="12">+49.86%</text>
+<text x="78" y="560" class="muted">FP register loop</text>
+<text x="358" y="560" class="muted">2418</text>
+<text x="498" y="560" fill="#15803d" font-size="12">+49.96%</text>
+<text x="78" y="582" class="muted">Matrix 2x4 x 4x2</text>
+<text x="358" y="582" class="muted">50</text>
+<text x="498" y="582" fill="#15803d" font-size="12">+3.85%</text>
+<text x="78" y="604" class="muted">MOV loop</text>
+<text x="358" y="604" class="muted">1004</text>
+<text x="498" y="604" fill="#15803d" font-size="12">+0.20%</text>
+<text x="78" y="626" class="muted">MUL loop</text>
+<text x="358" y="626" class="muted">1004</text>
+<text x="498" y="626" fill="#15803d" font-size="12">+0.20%</text>
+<text x="78" y="648" class="muted">FDIV loop</text>
+<text x="358" y="648" class="muted">2596</text>
+<text x="498" y="648" fill="#15803d" font-size="12">+49.36%</text>
+<text x="78" y="670" class="muted">Integer DIV loop</text>
+<text x="358" y="670" class="muted">1390</text>
+<text x="498" y="670" fill="#15803d" font-size="12">+69.19%</text>
+</svg>

@@ -1,0 +1,63 @@
+{
+  "name": "de1-intellisense",
+  "displayName": "DE1 Assembly",
+  "description": "IntelliSense support for the custom DE1 CPU assembly language.",
+  "version": "0.1.0",
+  "publisher": "local",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "activationEvents": [
+    "onLanguage:de1"
+  ],
+  "main": "./dist/src/extension.js",
+  "scripts": {
+    "compile": "tsc -p .",
+    "test": "npm run compile --silent && node --test dist/test/analyzerProtocol.test.js dist/test/languageData.test.js"
+  },
+  "contributes": {
+    "languages": [
+      {
+        "id": "de1",
+        "aliases": [
+          "DE1 Assembly",
+          "de1"
+        ],
+        "extensions": [
+          ".de1"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "de1",
+        "scopeName": "source.de1",
+        "path": "./syntaxes/de1.tmLanguage.json"
+      }
+    ],
+    "configuration": {
+      "title": "DE1",
+      "properties": {
+        "de1.pythonPath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to the Python interpreter used for DE1 diagnostics. Leave empty to auto-detect the workspace virtual environment or fall back to 'python'."
+        },
+        "de1.diagnostics.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable live DE1 diagnostics from the Python analyzer."
+        }
+      }
+    }
+  },
+  "devDependencies": {
+    "@types/node": "^24.3.0",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.9.2"
+  }
+}

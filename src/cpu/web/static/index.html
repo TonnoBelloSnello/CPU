@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en" class="h-auto lg:h-full">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark" />
+    <meta
+      name="description"
+      content="Assemble and run programs on the custom CPU, mirroring the DE1-SoC outputs: VGA framebuffer, LEDR, HEX displays, registers and memory."
+    />
+    <title>CPU simulator</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body class="h-auto text-ui lg:h-full">
+    <div class="grid grid-rows-[auto_1fr] gap-4 p-3 sm:p-4 lg:h-full">
+      <header
+        class="flex flex-col items-start gap-1 border-b border-line pb-3 sm:flex-row sm:items-baseline sm:justify-between sm:gap-4"
+      >
+        <h1 class="text-title font-semibold">
+          CPU simulator<span class="ml-3 text-small font-normal text-ink-faint">DE1-SoC target</span>
+        </h1>
+        <div id="status" class="status sm:text-right" role="status" aria-live="polite"></div>
+      </header>
+
+      <div class="grid min-h-0 gap-4 lg:grid-cols-[minmax(330px,400px)_minmax(0,1fr)]">
+        <section
+          class="flex min-h-0 flex-col gap-3 lg:overflow-y-auto lg:pr-2"
+          aria-label="Board outputs"
+        >
+          <section class="panel">
+            <div class="panel-head">
+              <h2 class="panel-title">VGA framebuffer</h2>
+              <span id="vga-value" class="readout">0 px lit</span>
+            </div>
+            <div class="panel-body flex flex-col gap-4 sm:flex-row sm:items-start">
+              <canvas
+                id="vga-canvas"
+                width="160"
+                height="120"
+                class="aspect-4/3 w-full max-w-56 flex-auto border border-line bg-black [image-rendering:pixelated]"
+                aria-label="VGA framebuffer output"
+              ></canvas>
+              <dl class="text-small text-ink-faint">
+                <dt>Resolution</dt>
+                <dd id="vga-dims" class="mb-2 font-mono text-ink-dim">160 &times; 120</dd>
+                <dt>Format</dt>
+                <dd class="font-mono text-ink-dim">RGB332</dd>
+              </dl>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-head">
+              <h2 class="panel-title">Push buttons</h2>
+              <span id="key-value" class="readout">KEY = 1111</span>
+            </div>
+            <div class="panel-body">
+              <div class="mb-2 grid grid-cols-4 gap-2" id="key-buttons">
+                <button type="button" class="btn key" data-key-index="3" aria-pressed="false">KEY3</button>
+                <button type="button" class="btn key" data-key-index="2" aria-pressed="false">KEY2</button>
+                <button type="button" class="btn key" data-key-index="1" aria-pressed="false">KEY1</button>
+                <button type="button" class="btn key" data-key-index="0" aria-pressed="false">KEY0</button>
+              </div>
+              <button type="button" id="key-release-btn" class="btn w-full">Release all keys</button>
+              <p class="panel-note">
+                Held buttons drive active-low <code>KEY[3:0]</code> from the start of the run.
+              </p>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-head">
+              <h2 class="panel-title">LEDR</h2>
+              <span id="le-value" class="readout">LE = &mdash;</span>
+            </div>
+            <div class="panel-body">
+              <div class="flex flex-wrap items-end gap-2" id="led-strip"></div>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-head">
+              <h2 class="panel-title">HEX displays</h2>
+              <span id="hex-value" class="readout">HEX = &mdash;</span>
+            </div>
+            <div class="panel-body">
+              <div class="flex flex-wrap items-end gap-3" id="hex-strip"></div>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-head">
+              <h2 class="panel-title">Registers</h2>
+            </div>
+            <div class="max-h-80 overflow-y-auto lg:max-h-58">
+              <table class="data-table">
+                <caption class="sr-only">Register file contents</caption>
+                <thead>
+                  <tr>
+                    <th scope="col">Reg</th>
+                    <th scope="col">Dec</th>
+                    <th scope="col">Hex</th>
+                  </tr>
+                </thead>
+                <tbody id="register-table"></tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-head">
+              <h2 class="panel-title">Memory</h2>
+            </div>
+            <div class="max-h-80 overflow-y-auto lg:max-h-52">
+              <table class="data-table">
+                <caption class="sr-only">Main memory window</caption>
+                <thead>
+                  <tr>
+                    <th scope="col">Addr</th>
+                    <th scope="col">Dec</th>
+                    <th scope="col">Hex</th>
+                  </tr>
+                </thead>
+                <tbody id="memory-table"></tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-head">
+              <h2 class="panel-title">Labels</h2>
+            </div>
+            <div class="panel-body">
+              <div id="labels" class="flex flex-wrap gap-x-2 gap-y-1"></div>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-head">
+              <h2 class="panel-title">Log</h2>
+            </div>
+            <div class="panel-body">
+              <pre
+                id="log"
+                tabindex="0"
+                class="max-h-44 overflow-y-auto font-mono text-mini leading-relaxed whitespace-pre-wrap text-ink-dim"
+              ></pre>
+            </div>
+          </section>
+        </section>
+
+        <section class="flex min-h-0 flex-col" aria-label="Program source">
+          <!-- The memory window the backend reports; not user-editable yet. -->
+          <input id="mem-start" type="hidden" value="0" />
+          <input id="mem-end" type="hidden" value="64" />
+
+          <div class="panel panel-fill">
+            <div class="panel-head">
+              <h2 class="panel-title">Program</h2>
+              <div class="flex flex-wrap items-center gap-3">
+                <label class="flex items-center gap-2 text-small text-ink-dim" for="simulation-engine">
+                  Engine
+                  <select id="simulation-engine" class="select">
+                    <option value="fast" selected>Fast (architectural)</option>
+                    <option value="rtl">RTL (cycle-accurate)</option>
+                  </select>
+                </label>
+                <button id="run-btn" type="button" class="btn btn-primary">Run</button>
+              </div>
+            </div>
+            <label class="sr-only" for="program">Assembly source</label>
+            <textarea
+              id="program"
+              spellcheck="false"
+              class="min-h-80 w-full flex-auto resize-none rounded-b-panel border-t border-line-soft bg-editor p-3 font-mono text-code leading-relaxed text-ink tab-4 placeholder:text-ink-faint focus-visible:-outline-offset-2"
+              placeholder="; Assembly source, e.g.&#10;    MOV R0, #1&#10;    ADD R1, R0, #2"
+            ></textarea>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <script src="/static/app.js"></script>
+  </body>
+</html>

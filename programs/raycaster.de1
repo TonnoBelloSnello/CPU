@@ -1,0 +1,1030 @@
+const TEX_BASE = 0x8000
+const TEX_SIZE = 1024
+const MAP_BASE = 0x9000
+const SIN_BASE = 0x9400
+const SKY_BASE = 0x9600
+
+const FP_BIAS = 0x6600  # int<->fp16 magic-constant bias
+const FP_SIGN = 0x8000  # fp16 sign bit
+
+const LCG_MUL = 25173  # 16-bit linear congruential pair
+const LCG_ADD = 13849
+
+space:
+    posx  = 0000000000000000
+    posy  = 0000000000000000
+    pang  = 00000000
+
+    dirx  = 0000000000000000
+    diry  = 0000000000000000
+    plnx  = 0000000000000000
+    plny  = 0000000000000000
+
+    raydx = 0000000000000000
+    raydy = 0000000000000000
+    ddx   = 0000000000000000
+    ddy   = 0000000000000000
+    sdx   = 0000000000000000
+    sdy   = 0000000000000000
+    perpd = 0000000000000000
+    texst = 0000000000000000
+    texps = 0000000000000000
+
+    colx  = 0000000000000000
+    mapx  = 0000000000000000
+    mapy  = 0000000000000000
+    side  = 0000000000000000
+    texn  = 0000000000000000
+    texx  = 0000000000000000
+    dstart = 0000000000000000
+    dend  = 0000000000000000
+    lineh = 0000000000000000
+    ytop  = 0000000000000000
+
+    keys  = 0000000000000000
+
+main:
+    MOV R11, =FP_BIAS
+
+    BL gen_sin
+    BL gen_tex
+    BL gen_map
+    BL gen_sky
+
+    MOV R0, V1
+    ADD R0, R0, R11
+    FSUB R0, R0, F1536.0
+    FADD R0, R0, F0.5
+    SAVEM R0, [posx]
+    SAVEM R0, [posy]
+    MOV R0, V0
+    SAVE R0, [pang]
+
+frame_loop:
+    BL read_input
+    BL setup_camera
+    BL render
+    BL draw_hud
+    B frame_loop
+
+read_input:
+    PUSH {LR}
+
+    WAITKNB R0, V15
+    SAVE R0, [keys]
+    MOV LE, R0
+
+    MOV R1, [pang]
+    TST R0, V1
+    ADDNE R1, R1, V1
+    TST R0, V8
+    SUBNE R1, R1, V1
+    AND R1, R1, V255
+    SAVE R1, [pang]
+
+    MOV R2, [keys]
+    TST R2, V2
+    BNE move_forward
+    TST R2, V4
+    BNE move_back
+    POP {PC}
+
+move_forward:
+    MOV R3, V1
+    B do_move
+move_back:
+    MOV R3, V0
+
+do_move:
+    MOV R0, [pang]
+    BL sin_lookup
+    MOV R4, R1
+    MOV R0, [pang]
+    ADD R0, R0, V64
+    AND R0, R0, V255
+    BL sin_lookup
+    MOV R5, R1
+
+    FMUL R4, R4, F0.05
+    FMUL R5, R5, F0.05
+    CMP R3, V1
+    BEQ move_apply
+    MOV R6, V0
+    FSUB R4, R6, R4
+    MOV R6, V0
+    FSUB R5, R6, R5
+
+move_apply:
+    MOVM R0, [posx]
+    FADD R0, R0, R5
+    MOVM R1, [posy]
+    BL cell_at
+    CMP R2, V0
+    BNE move_skip_x
+    SAVEM R0, [posx]
+move_skip_x:
+
+    MOVM R0, [posx]
+    MOVM R1, [posy]
+    FADD R1, R1, R4
+    BL cell_at
+    CMP R2, V0
+    BNE move_skip_y
+    SAVEM R1, [posy]
+move_skip_y:
+
+    POP {PC}
+
+cell_at:
+    FADD R6, R0, F1536.0
+    SUB R6, R6, R11
+    ADD R7, R6, R11
+    FSUB R7, R7, F1536.0
+    FCMP R7, R0
+    SUBGT R6, R6, V1
+
+    FADD R8, R1, F1536.0
+    SUB R8, R8, R11
+    ADD R7, R8, R11
+    FSUB R7, R7, F1536.0
+    FCMP R7, R1
+    SUBGT R8, R8, V1
+
+    MOV R2, =MAP_BASE
+    LSL R7, R8, V5
+    ADD R7, R7, R6
+    ADD R7, R7, R2
+    MOV R2, [R7]
+    MOV PC, R14
+
+sin_lookup:
+    AND R1, R0, V255
+    MOV R2, =SIN_BASE
+    ADD R2, R2, R1 LSL V1
+    MOVM R1, [R2]
+    MOV PC, R14
+
+setup_camera:
+    PUSH {LR}
+
+    MOV R0, [pang]
+    ADD R0, R0, V64
+    AND R0, R0, V255
+    BL sin_lookup
+    SAVEM R1, [dirx]
+
+    MOV R0, [pang]
+    BL sin_lookup
+    SAVEM R1, [diry]
+
+    MOVM R0, [diry]
+    FMUL R0, R0, F0.66
+    SAVEM R0, [plnx]
+
+    MOVM R0, [dirx]
+    FMUL R0, R0, F0.66
+    MOV R1, V0
+    FSUB R0, R1, R0
+    SAVEM R0, [plny]
+
+    POP {PC}
+
+render:
+    PUSH {LR}
+    MOV R0, V0
+    SAVEM R0, [colx]
+
+col_loop:
+    MOVM R0, [colx]
+    ADD R0, R0, R11
+    FSUB R0, R0, F1536.0
+    FMUL R0, R0, F0.0125
+    FSUB R0, R0, F1.0
+
+    MOVM R2, [dirx]
+    MOVM R1, [plnx]
+    FMUL R1, R1, R0
+    FADD R1, R1, R2
+    SAVEM R1, [raydx]
+
+    MOVM R3, [diry]
+    MOVM R2, [plny]
+    FMUL R2, R2, R0
+    FADD R2, R2, R3
+    SAVEM R2, [raydy]
+
+    MOV R6, =FP_SIGN
+    FMOV R5, F1.0
+    MOVM R3, [raydx]
+    BIC R3, R3, R6
+    FCMP R3, F0.01
+    BLE ddx_big
+    MOVM R4, [raydx]
+    FDIV R4, R5, R4
+    BIC R4, R4, R6
+    B ddx_done
+ddx_big:
+    FMOV R4, F999.0
+ddx_done:
+    SAVEM R4, [ddx]
+
+    MOVM R3, [raydy]
+    BIC R3, R3, R6
+    FCMP R3, F0.01
+    BLE ddy_big
+    MOVM R4, [raydy]
+    FDIV R4, R5, R4
+    BIC R4, R4, R6
+    B ddy_done
+ddy_big:
+    FMOV R4, F999.0
+ddy_done:
+    SAVEM R4, [ddy]
+
+    MOVM R0, [posx]
+    MOVM R1, [posy]
+    BL floor_pair
+    SAVEM R6, [mapx]
+    SAVEM R8, [mapy]
+
+    MOVM R0, [raydx]
+    CMP R0, V0
+    BLT sdx_neg
+    MOV R2, V1
+    SAVEM R2, [side]
+    MOVM R4, [posx]
+    MOVM R3, [mapx]
+    ADD R3, R3, V1
+    ADD R3, R3, R11
+    FSUB R3, R3, F1536.0
+    FSUB R3, R3, R4
+    B sdx_scale
+sdx_neg:
+    MOV R2, V0
+    SUB R2, R2, V1
+    SAVEM R2, [side]
+    MOVM R4, [posx]
+    MOVM R3, [mapx]
+    ADD R3, R3, R11
+    FSUB R5, R3, F1536.0
+    FSUB R3, R4, R5
+sdx_scale:
+    MOVM R5, [ddx]
+    FMUL R3, R3, R5
+    SAVEM R3, [sdx]
+    MOVM R2, [side]
+    SAVEM R2, [texn]
+
+    MOVM R0, [raydy]
+    CMP R0, V0
+    BLT sdy_neg
+    MOV R2, V1
+    SAVEM R2, [side]
+    MOVM R4, [posy]
+    MOVM R3, [mapy]
+    ADD R3, R3, V1
+    ADD R3, R3, R11
+    FSUB R3, R3, F1536.0
+    FSUB R3, R3, R4
+    B sdy_scale
+sdy_neg:
+    MOV R2, V0
+    SUB R2, R2, V1
+    SAVEM R2, [side]
+    MOVM R4, [posy]
+    MOVM R3, [mapy]
+    ADD R3, R3, R11
+    FSUB R5, R3, F1536.0
+    FSUB R3, R4, R5
+sdy_scale:
+    MOVM R5, [ddy]
+    FMUL R3, R3, R5
+    SAVEM R3, [sdy]
+
+    MOVM R2, [sdx]
+    MOVM R3, [sdy]
+    MOVM R4, [ddx]
+    MOVM R5, [ddy]
+    MOVM R6, [mapx]
+    MOVM R7, [mapy]
+    MOVM R8, [texn]
+    MOVM R9, [side]
+    MOV R12, =MAP_BASE
+
+dda_loop:
+    FCMP R2, R3
+    BGE dda_stepy
+dda_stepx:
+    FADD R2, R2, R4
+    ADD R6, R6, R8
+    MOV R10, V0
+    B dda_probe
+dda_stepy:
+    FADD R3, R3, R5
+    ADD R7, R7, R9
+    MOV R10, V1
+dda_probe:
+    CMP R6, V31
+    BHI dda_escape
+    CMP R7, V31
+    BHI dda_escape
+    LSL R0, R7, V5
+    ADD R0, R0, R6
+    ADD R0, R0, R12
+    MOV R1, [R0]
+    CMP R1, V0
+    BEQ dda_loop
+    B dda_hit
+dda_escape:
+    MOV R1, V1
+dda_hit:
+
+    SAVEM R1, [texn]
+    SAVEM R10, [side]
+    SAVEM R6, [mapx]
+    SAVEM R7, [mapy]
+
+    CMP R10, V0
+    BNE perp_y
+    FSUB R2, R2, R4
+    SAVEM R2, [perpd]
+    B perp_done
+perp_y:
+    FSUB R3, R3, R5
+    SAVEM R3, [perpd]
+perp_done:
+
+    MOVM R0, [perpd]
+    FCMP R0, F0.02
+    BGE perp_ok
+    FMOV R0, F0.02
+    SAVEM R0, [perpd]
+perp_ok:
+
+    BL wall_slice
+
+    MOVM R0, [colx]
+    ADD R0, R0, V1
+    SAVEM R0, [colx]
+    CMP R0, V160
+    BLT col_loop
+
+    POP {PC}
+
+floor_pair:
+    FADD R6, R0, F1536.0
+    SUB R6, R6, R11
+    ADD R7, R6, R11
+    FSUB R7, R7, F1536.0
+    FCMP R7, R0
+    SUBGT R6, R6, V1
+
+    FADD R8, R1, F1536.0
+    SUB R8, R8, R11
+    ADD R7, R8, R11
+    FSUB R7, R7, F1536.0
+    FCMP R7, R1
+    SUBGT R8, R8, V1
+    MOV PC, R14
+
+wall_slice:
+    PUSH {LR}
+
+    MOVM R0, [colx]
+    MOV R2, V0
+    CMP R0, V44
+    MOVLT R2, V32
+    SAVEM R2, [ytop]
+
+    MOVM R1, [perpd]
+    FMOV R0, F120.0
+    FDIV R0, R0, R1
+    FCMP R0, F400.0
+    BLE lineh_ok
+    FMOV R0, F400.0
+lineh_ok:
+    SAVEM R0, [lineh]
+
+    MOVM R3, [lineh]
+    FMOV R2, F32.0
+    FDIV R2, R2, R3
+    SAVEM R2, [texst]
+
+    MOVM R0, [lineh]
+    MOVM R2, [ytop]
+    FMUL R0, R0, F0.5
+    FMOV R1, F60.0
+    FSUB R1, R1, R0
+    FADD R1, R1, F1536.0
+    SUB R1, R1, R11
+    MAX R1, R1, R2
+    SAVEM R1, [dstart]
+
+    MOVM R0, [lineh]
+    FMUL R0, R0, F0.5
+    FMOV R1, F60.0
+    FADD R1, R1, R0
+    FADD R1, R1, F1536.0
+    SUB R1, R1, R11
+    SAVEM R1, [dend]
+
+    MOVM R0, [side]
+    CMP R0, V0
+    BNE wallx_y
+    MOVM R3, [raydy]
+    MOVM R2, [perpd]
+    MOVM R1, [posy]
+    FMUL R2, R2, R3
+    FADD R1, R1, R2
+    B wallx_done
+wallx_y:
+    MOVM R3, [raydx]
+    MOVM R2, [perpd]
+    MOVM R1, [posx]
+    FMUL R2, R2, R3
+    FADD R1, R1, R2
+wallx_done:
+    FADD R4, R1, F1536.0
+    SUB R4, R4, R11
+    ADD R5, R4, R11
+    FSUB R5, R5, F1536.0
+    FCMP R5, R1
+    SUBGT R4, R4, V1
+    ADD R5, R4, R11
+    FSUB R5, R5, F1536.0
+    FSUB R1, R1, R5
+
+    FMUL R1, R1, F32.0
+    FADD R1, R1, F1536.0
+    SUB R1, R1, R11
+    AND R1, R1, V31
+
+    MOVM R2, [side]
+    CMP R2, V0
+    BNE texflip_y
+    MOVM R3, [raydx]
+    CMP R3, V0
+    BLT texflip_done
+    RSB R1, R1, V31
+    B texflip_done
+texflip_y:
+    MOVM R3, [raydy]
+    CMP R3, V0
+    BGE texflip_done
+    RSB R1, R1, V31
+texflip_done:
+    SAVEM R1, [texx]
+
+    MOVM R1, [lineh]
+    MOVM R0, [dstart]
+    ADD R0, R0, R11
+    FSUB R0, R0, F1536.0
+    FSUB R0, R0, F60.0
+    FMUL R1, R1, F0.5
+    FADD R0, R0, R1
+    MOVM R1, [texst]
+    FMUL R0, R0, R1
+    SAVEM R0, [texps]
+
+    BL paint_column
+    POP {PC}
+
+paint_column:
+    MOVM R0, [colx]
+    MOVM R2, [dstart]
+    MOV R3, V120
+    MIN R2, R2, R3
+    MOVM R1, [ytop]
+    MOV R7, =SKY_BASE
+
+ceil_loop:
+    CMP R1, R2
+    BGE ceil_done
+    ADD R4, R7, R1
+    MOV R5, [R4]
+    PIXELNB R0, R1, R5
+    ADD R1, R1, V1
+    B ceil_loop
+ceil_done:
+
+    MOVM R4, [texx]
+    MOV R5, =TEX_BASE
+    MOVM R3, [texn]
+    SUB R3, R3, V1
+    AND R3, R3, V3
+    LSL R8, R3, V10
+    ADD R8, R8, R4 LSL V5
+    ADD R8, R8, R5
+
+    MOVM R2, [dend]
+    MOV R3, V120
+    MIN R2, R2, R3
+    MOVM R9, [texps]
+    MOVM R6, [texst]
+
+wall_loop:
+    CMP R1, R2
+    BGE wall_done
+    FADD R3, R9, F1536.0
+    SUB R3, R3, R11
+    AND R3, R3, V31
+    ADD R4, R8, R3
+    MOV R5, [R4]
+
+    MOVM R4, [side]
+    CMP R4, V0
+    BEQ wall_plot
+    AND R4, R5, V218
+    LSR R5, R4, V1
+wall_plot:
+    PIXELNB R0, R1, R5
+    FADD R9, R9, R6
+    ADD R1, R1, V1
+    B wall_loop
+wall_done:
+
+floor_loop:
+    CMP R1, V120
+    BGE floor_done
+    ADD R4, R7, R1
+    MOV R5, [R4]
+    PIXELNB R0, R1, R5
+    ADD R1, R1, V1
+    B floor_loop
+floor_done:
+    MOV PC, R14
+
+draw_hud:
+    PUSH {LR}
+
+    MOV R1, V0
+hud_bg_row:
+    MOV R0, V32
+hud_bg_col:
+    PIXELNB R0, R1, V0
+    ADD R0, R0, V1
+    CMP R0, V44
+    BLT hud_bg_col
+    ADD R1, R1, V1
+    CMP R1, V32
+    BLT hud_bg_row
+
+    MOV R7, =MAP_BASE
+    MOV R1, V0
+hud_row:
+    MOV R0, V0
+hud_col:
+    LSL R6, R1, V5
+    ADD R6, R6, R0
+    ADD R6, R6, R7
+    MOV R2, [R6]
+
+    CMP R2, V0
+    BEQ hud_open
+    MOV R3, V164
+    CMP R2, V2
+    MOVEQ R3, V146
+    CMP R2, V3
+    MOVEQ R3, V173
+    CMP R2, V4
+    MOVEQ R3, V46
+    B hud_plot
+hud_open:
+    MOV R3, V0
+hud_plot:
+    PIXELNB R0, R1, R3
+    ADD R0, R0, V1
+    CMP R0, V32
+    BLT hud_col
+    ADD R1, R1, V1
+    CMP R1, V32
+    BLT hud_row
+
+    MOVM R0, [posx]
+    MOVM R1, [posy]
+    BL floor_pair
+    MOV R0, R6
+    MOV R1, R8
+    PIXELNB R0, R1, V255
+
+    MOV R0, [pang]
+    ADD R0, R0, V64
+    AND R0, R0, V255
+    BL sin_lookup
+    MOV R4, R1
+    MOV R0, [pang]
+    BL sin_lookup
+    MOV R5, R1
+
+    MOVM R0, [posx]
+    FADD R0, R0, R4
+    MOVM R1, [posy]
+    FADD R1, R1, R5
+    BL floor_pair
+    MOV R0, R6
+    MOV R1, R8
+    CMP R0, V32
+    BHI hud_no_dir
+    CMP R1, V32
+    BHI hud_no_dir
+    PIXELNB R0, R1, V252
+hud_no_dir:
+
+    MOV R0, [pang]
+    ADD R0, R0, V32
+    AND R0, R0, V255
+    LSR R0, R0, V6
+    MOV R12, V255
+    CMP R0, V0
+    BEQ hud_east
+    CMP R0, V1
+    BEQ hud_south
+    CMP R0, V2
+    BEQ hud_west
+    TEXT V36, V2, "N"
+    B hud_done
+hud_east:
+    TEXT V36, V2, "E"
+    B hud_done
+hud_south:
+    TEXT V36, V2, "S"
+    B hud_done
+hud_west:
+    TEXT V36, V2, "W"
+hud_done:
+    POP {PC}
+
+gen_sin:
+    MOV R10, =SIN_BASE
+    MOV R9, =FP_SIGN
+    MOV R0, V0
+gen_sin_loop:
+    ADD R1, R0, R11
+    FSUB R1, R1, F1536.0
+    FMUL R1, R1, F0.024543693
+    FMUL R2, R1, R1
+
+    FMOV R3, F-0.000198413
+    FMUL R3, R3, R2
+    FADD R3, R3, F0.008333333
+    FMUL R3, R3, R2
+    FADD R3, R3, F-0.166666667
+    FMUL R3, R3, R2
+    FADD R3, R3, F1.0
+    FMUL R3, R3, R1
+
+    EOR R5, R3, R9
+
+    ADD R6, R10, R0 LSL V1
+    SAVEM R3, [R6]
+    MOV R7, V128
+    SUB R7, R7, R0
+    ADD R6, R10, R7 LSL V1
+    SAVEM R3, [R6]
+    ADD R7, R0, V128
+    ADD R6, R10, R7 LSL V1
+    SAVEM R5, [R6]
+    MOV R7, V256
+    SUB R7, R7, R0
+    AND R7, R7, V255
+    ADD R6, R10, R7 LSL V1
+    SAVEM R5, [R6]
+
+    ADD R0, R0, V1
+    CMP R0, V65
+    BLT gen_sin_loop
+    MOV PC, R14
+
+gen_tex:
+    MOV R10, =LCG_MUL
+    MOV R12, =LCG_ADD
+    MOV R8, V777
+
+    MOV R7, =TEX_BASE
+
+    MOV R0, V0
+tex0_x:
+    MOV R1, V0
+tex0_y:
+    MUL R8, R8, R10
+    ADD R8, R8, R12
+    MOV R2, V219
+    AND R3, R1, V7
+    CMP R3, V0
+    BEQ tex0_store
+    LSR R3, R1, V3
+    AND R3, R3, V1
+    LSL R3, V3
+    ADD R4, R0, R3
+    AND R4, R4, V15
+    CMP R4, V0
+    BEQ tex0_store
+    LSR R4, R1, V3
+    ADD R5, R0, R3
+    LSR R5, R5, V4
+    MUL R4, R4, V5
+    MADD R4, R5, V3
+    AND R4, R4, V3
+    MOV R2, V164
+    CMP R4, V0
+    MOVEQ R2, V132
+    CMP R4, V1
+    MOVEQ R2, V196
+tex0_store:
+    LSL R6, R0, V5
+    ADD R6, R6, R1
+    ADD R6, R6, R7
+    SAVE R2, [R6]
+    ADD R1, R1, V1
+    CMP R1, V32
+    BLT tex0_y
+    ADD R0, R0, V1
+    CMP R0, V32
+    BLT tex0_x
+
+    ADD R7, R7, TEX_SIZE
+    MOV R0, V0
+tex1_x:
+    MOV R1, V0
+tex1_y:
+    MUL R8, R8, R10
+    ADD R8, R8, R12
+    AND R3, R0, V15
+    AND R4, R1, V15
+    MOV R2, V73
+    CMP R3, V0
+    BEQ tex1_store
+    CMP R4, V0
+    BEQ tex1_store
+    MOV R2, V182
+    CMP R3, V1
+    BEQ tex1_store
+    CMP R4, V1
+    BEQ tex1_store
+    LSR R5, R0, V4
+    LSR R9, R1, V4
+    MUL R5, R5, V7
+    MADD R5, R9, V3
+    AND R5, R5, V3
+    MOV R2, V146
+    CMP R5, V0
+    MOVEQ R2, V109
+tex1_store:
+    LSL R6, R0, V5
+    ADD R6, R6, R1
+    ADD R6, R6, R7
+    SAVE R2, [R6]
+    ADD R1, R1, V1
+    CMP R1, V32
+    BLT tex1_y
+    ADD R0, R0, V1
+    CMP R0, V32
+    BLT tex1_x
+
+    ADD R7, R7, TEX_SIZE
+    MOV R0, V0
+tex2_x:
+    MOV R1, V0
+tex2_y:
+    MUL R8, R8, R10
+    ADD R8, R8, R12
+    MOV R2, V65
+    AND R3, R0, V7
+    CMP R3, V0
+    BEQ tex2_store
+    MOV R2, V173
+    MUL R5, R0, V11
+    AND R5, R5, V7
+    CMP R5, V2
+    MOVLT R2, V141
+tex2_store:
+    LSL R6, R0, V5
+    ADD R6, R6, R1
+    ADD R6, R6, R7
+    SAVE R2, [R6]
+    ADD R1, R1, V1
+    CMP R1, V32
+    BLT tex2_y
+    ADD R0, R0, V1
+    CMP R0, V32
+    BLT tex2_x
+
+    ADD R7, R7, TEX_SIZE
+    MOV R0, V0
+tex3_x:
+    MOV R1, V0
+tex3_y:
+    AND R3, R0, V15
+    AND R4, R1, V15
+    MOV R2, V5
+    CMP R3, V0
+    BEQ tex3_store
+    CMP R4, V0
+    BEQ tex3_store
+    SUB R5, R3, V8
+    MUL R5, R5, R5
+    SUB R9, R4, V8
+    MUL R9, R9, R9
+    MOV R2, V46
+    ADD R5, R5, R9
+    CMP R5, V9
+    MOVLE R2, V118
+    CMP R5, V5
+    MOVLE R2, V191
+tex3_store:
+    LSL R6, R0, V5
+    ADD R6, R6, R1
+    ADD R6, R6, R7
+    SAVE R2, [R6]
+    ADD R1, R1, V1
+    CMP R1, V32
+    BLT tex3_y
+    ADD R0, R0, V1
+    CMP R0, V32
+    BLT tex3_x
+    MOV PC, R14
+
+gen_map:
+    MOV R10, =LCG_MUL
+    MOV R12, =LCG_ADD
+    MOV R8, V1897
+
+    MOV R7, =MAP_BASE
+    MOV R0, V0
+    MOV R2, V1
+map_fill:
+    ADD R6, R7, R0
+    SAVE R2, [R6]
+    ADD R0, R0, V1
+    CMP R0, V1024
+    BLT map_fill
+
+    MOV R1, V1
+maze_y:
+    MOV R0, V1
+maze_x:
+    MUL R8, R8, R10
+    ADD R8, R8, R12
+    LSL R6, R1, V5
+    ADD R6, R6, R0
+    ADD R6, R6, R7
+    MOV R2, V0
+    SAVE R2, [R6]
+
+    MOV R3, V0
+    CMP R1, V1
+    MOVGT R3, V1
+    MOV R4, V0
+    CMP R0, V29
+    MOVLT R4, V1
+    LSR R5, R8, V9
+    AND R5, R5, V1
+
+    CMP R3, V0
+    BEQ maze_try_east
+    CMP R4, V0
+    BEQ maze_do_north
+    CMP R5, V0
+    BEQ maze_do_north
+    B maze_do_east
+maze_do_north:
+    SUB R9, R1, V1
+    LSL R6, R9, V5
+    ADD R6, R6, R0
+    ADD R6, R6, R7
+    MOV R2, V0
+    SAVE R2, [R6]
+    B maze_next
+maze_try_east:
+    CMP R4, V0
+    BEQ maze_next
+maze_do_east:
+    LSL R6, R1, V5
+    ADD R6, R6, R0
+    ADD R6, R6, V1
+    ADD R6, R6, R7
+    MOV R2, V0
+    SAVE R2, [R6]
+maze_next:
+    ADD R0, R0, V2
+    CMP R0, V30
+    BLT maze_x
+    ADD R1, R1, V2
+    CMP R1, V30
+    BLT maze_y
+
+    MOV R5, V0
+room_loop:
+    MUL R8, R8, R10
+    ADD R8, R8, R12
+    LSR R0, R8, V8
+    AND R0, R0, V15
+    ADD R0, R0, V4
+    MUL R8, R8, R10
+    ADD R8, R8, R12
+    LSR R1, R8, V8
+    AND R1, R1, V15
+    ADD R1, R1, V4
+    MOV R2, V0
+room_y:
+    MOV R3, V0
+room_x:
+    ADD R9, R1, R2
+    LSL R6, R9, V5
+    ADD R9, R0, R3
+    ADD R6, R6, R9
+    ADD R6, R6, R7
+    MOV R4, V0
+    SAVE R4, [R6]
+    ADD R3, R3, V1
+    CMP R3, V5
+    BLT room_x
+    ADD R2, R2, V1
+    CMP R2, V5
+    BLT room_y
+    ADD R5, R5, V1
+    CMP R5, V8
+    BLT room_loop
+
+    MOV R1, V0
+assign_y:
+    MOV R0, V0
+assign_x:
+    LSL R6, R1, V5
+    ADD R6, R6, R0
+    ADD R6, R6, R7
+    MOV R2, [R6]
+    MOV R3, V0
+    CMP R0, V0
+    MOVEQ R3, V1
+    CMP R0, V31
+    MOVEQ R3, V1
+    CMP R1, V0
+    MOVEQ R3, V1
+    CMP R1, V31
+    MOVEQ R3, V1
+    CMP R3, V1
+    MOVEQ R2, V1
+    CMP R2, V0
+    BEQ assign_next
+    LSR R4, R0, V3
+    LSR R5, R1, V3
+    ADD R4, R4, R5
+    AND R4, R4, V3
+    ADD R4, R4, V1
+    SAVE R4, [R6]
+assign_next:
+    ADD R0, R0, V1
+    CMP R0, V32
+    BLT assign_x
+    ADD R1, R1, V1
+    CMP R1, V32
+    BLT assign_y
+
+    MOV R1, V1
+spawn_y:
+    MOV R0, V1
+spawn_x:
+    LSL R6, R1, V5
+    ADD R6, R6, R0
+    ADD R6, R6, R7
+    MOV R2, V0
+    SAVE R2, [R6]
+    ADD R0, R0, V1
+    CMP R0, V3
+    BLT spawn_x
+    ADD R1, R1, V1
+    CMP R1, V3
+    BLT spawn_y
+    MOV PC, R14
+
+gen_sky:
+    MOV R7, =SKY_BASE
+    MOV R0, V0
+sky_loop:
+    CMP R0, V60
+    BGE sky_floor
+    LSR R1, R0, V4
+    MOV R5, V0
+    MOV R6, V0
+    LSR R2, R1, V1
+    ADD R2, R2, V1
+    LSL R4, R1, V2
+    ADD R4, R4, R2
+    B sky_store
+sky_floor:
+    SUB R1, R0, V60
+    LSR R1, R1, V4
+    ADD R2, R1, V2
+    MOV R5, V0
+    LSR R3, R2, V1
+    LSL R4, R2, V5
+    ADD R4, R4, R2 LSL V2
+    ADD R4, R4, R3
+sky_store:
+    ADD R5, R7, R0
+    SAVE R4, [R5]
+    ADD R0, R0, V1
+    CMP R0, V120
+    BLT sky_loop
+    MOV PC, R14

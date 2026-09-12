@@ -1,0 +1,475 @@
+main:
+    MOV R0, V0
+    MOV R1, V0
+    MOV R2, V160
+    MOV R3, V120
+    MOV R12, BG
+    BL fill_rect
+    MOV R0, =title
+    MOV R6, V8
+    MOV R7, V3
+    MOV R3, WHITE
+    BL draw_string
+    MOV R0, =hint
+    MOV R7, V111
+    MOV R3, CYAN
+    BL draw_string
+    BL show_prompt
+    MOV R4, V0
+paint_keyboard:
+    BL draw_key
+    ADD R4, V1
+    CMP R4, V32
+    BLT paint_keyboard
+    NPUCFG FLAGS, V0
+    NPUCFG IN_W, V1
+    NPUCFG IN_H, V1
+    NPUCFG OUT_W, V1
+    NPUCFG OUT_H, V1
+    NPUCFG K_W, V1
+    NPUCFG K_H, V1
+    NPUCFG STRIDE, V257
+    NPUCFG PAD, V0
+    NPUCFG IN_ZP, V0
+    NPUCFG OUT_ZP, V0
+    MOV R0, =status_ready
+    BL show_status
+input_loop:
+    MOV R0, V1
+    SAVE R0, [ready]
+    BL read_key
+    MOV R1, V0
+    SAVE R1, [ready]
+    MOV R4, [selected]
+    MOV R5, R4
+    CMP R0, V1
+    BEQ move_left
+    CMP R0, V8
+    BEQ move_right
+    CMP R0, V2
+    BEQ move_row
+    CMP R0, V4
+    BEQ choose_key
+    B input_loop
+move_left:
+    SUB R5, V1
+    AND R5, V7
+    AND R0, R4, V24
+    ORR R5, R0
+    B move_selection
+move_right:
+    ADD R5, V1
+    AND R5, V7
+    AND R0, R4, V24
+    ORR R5, R0
+    B move_selection
+move_row:
+    ADD R5, V8
+    AND R5, V31
+move_selection:
+    SAVE R5, [selected]
+    BL draw_key
+    MOV R4, R5
+    BL draw_key
+    B input_loop
+choose_key:
+    CMP R4, V31
+    BEQ request_generation
+    CMP R4, V30
+    BEQ clear_prompt
+    CMP R4, V29
+    BEQ backspace
+    MOV R5, [prompt_len]
+    CMP R5, MAX_PROMPT
+    BGE prompt_full
+    MOV R0, =key_chars
+    ADD R0, R4
+    MOV R0, [R0]
+    MOV R1, =prompt
+    ADD R1, R5
+    SAVE R0, [R1]
+    ADD R5, V1
+    SAVE R5, [prompt_len]
+    ADD R1, V1
+    MOV R0, V0
+    SAVE R0, [R1]
+    B prompt_changed
+backspace:
+    MOV R5, [prompt_len]
+    CMP R5, V0
+    BEQ input_loop
+    SUB R5, V1
+    SAVE R5, [prompt_len]
+    MOV R1, =prompt
+    ADD R1, R5
+    MOV R0, V0
+    SAVE R0, [R1]
+    B prompt_changed
+clear_prompt:
+    MOV R0, V0
+    SAVE R0, [prompt_len]
+    SAVE R0, [prompt]
+prompt_changed:
+    BL show_prompt
+    MOV R0, =status_ready
+    BL show_status
+    B input_loop
+prompt_full:
+    MOV R0, =status_full
+    BL show_status
+    B input_loop
+request_generation:
+    MOV R0, [prompt_len]
+    CMP R0, V0
+    BEQ empty_prompt
+    BL generate_text
+    B input_loop
+empty_prompt:
+    MOV R0, =status_empty
+    BL show_status
+    B input_loop
+
+read_key:
+release_keys:
+    WAITKNB R0, V15
+    CMP R0, V0
+    BNE release_keys
+    WAIT V20
+    WAITKNB R0, V15
+    CMP R0, V0
+    BNE release_keys
+wait_press:
+    WAITK R0, V15
+    WAIT V20
+    WAITKNB R1, V15
+    CMP R0, R1
+    BNE release_keys
+    MOV PC, LR
+show_status:
+    PUSH {R3, R6, R7, R12, LR}
+    MOV R6, V116
+    MOV R7, V3
+    MOV R3, CYAN
+    MOV R12, BG
+    BL draw_string
+    POP {R3, R6, R7, R12, LR}
+    MOV PC, LR
+show_prompt:
+    PUSH {R0-R12, LR}
+    MOV R0, V8
+    MOV R1, V17
+    MOV R2, V144
+    MOV R3, V8
+    MOV R12, BG
+    BL fill_rect
+    MOV R0, =prompt
+    MOV R6, V8
+    MOV R7, V17
+    MOV R3, CYAN
+    BL draw_string
+    MOV R1, [prompt_len]
+    CMP R1, MAX_PROMPT
+    BGE prompt_drawn
+    MUL R6, R1, V6
+    ADD R6, V8
+    MOV R0, "_"
+    BL draw_char
+prompt_drawn:
+    POP {R0-R12, LR}
+    MOV PC, LR
+
+draw_key:
+    PUSH {R0-R12, LR}
+    AND R6, R4, V7
+    MUL R6, V18
+    ADD R6, V8
+    LSR R7, R4, V3
+    MUL R7, V11
+    ADD R7, V65
+    MOV R12, KEY_BG
+    MOV R5, [selected]
+    CMP R4, R5
+    MOVEQ R12, SELECTED
+    MOV R0, R6
+    MOV R1, R7
+    MOV R2, V16
+    MOV R3, V10
+    BL fill_rect
+    MOV R3, WHITE
+    CMP R4, R5
+    MOVEQ R3, BG
+    ADD R6, V2
+    ADD R7, V1
+    CMP R4, V28
+    BGE special_key
+    MOV R0, =key_chars
+    ADD R0, R4
+    MOV R0, [R0]
+    ADD R6, V3
+    BL draw_char
+    B key_drawn
+special_key:
+    CMP R4, V29
+    BEQ delete_key
+    CMP R4, V28
+    MOVEQ R0, "S"
+    CMP R4, V30
+    MOVEQ R0, "C"
+    CMP R4, V31
+    MOVEQ R0, "G"
+    BL draw_char
+    ADD R6, V6
+    CMP R4, V28
+    MOVEQ R0, "P"
+    CMP R4, V30
+    MOVEQ R0, "L"
+    CMP R4, V31
+    MOVEQ R0, "O"
+    BL draw_char
+    B key_drawn
+delete_key:
+    MOV R0, "<"
+    ADD R6, V3
+    BL draw_char
+key_drawn:
+    POP {R0-R12, LR}
+    MOV PC, LR
+generate_text:
+    PUSH {R0-R12, LR}
+    MOV R0, V0
+    SAVE R0, [ready]
+    SAVE R0, [output_len]
+    SAVE R0, [generated]
+    MOV LE, V0
+    MOV R0, =status_busy
+    BL show_status
+    MOV R0, V8
+    MOV R1, V29
+    MOV R2, V144
+    MOV R3, V28
+    MOV R12, BG
+    BL fill_rect
+    MOV R0, V0
+    MOV R1, =context
+    MOV R2, CONTEXT
+reset_context:
+    SAVE R0, [R1]
+    ADD R1, V1
+    SUB R2, V1
+    CMP R2, V0
+    BNE reset_context
+    MOV R10, =prompt
+    MOV R11, [prompt_len]
+copy_prefix:
+    MOV R0, [R10]
+    BL emit_char
+    BL push_context
+    ADD R10, V1
+    SUB R11, V1
+    CMP R11, V0
+    BNE copy_prefix
+generate_loop:
+    BL infer
+    CMP R0, V-1
+    BEQ generation_failed
+    MOV R1, =alphabet
+    ADD R1, R0
+    MOV R0, [R1]
+    BL emit_char
+    BL push_context
+    CMP R0, "."
+    BEQ generation_done
+    MOV R1, [output_len]
+    CMP R1, LINE_CHARS
+    BLT generate_loop
+generation_done:
+    MOV LE, V1
+    MOV R0, [generation_count]
+    ADD R0, V1
+    SAVE R0, [generation_count]
+    MOV R0, =status_ready
+    BL show_status
+    B generation_return
+generation_failed:
+    MOV R0, =status_error
+    BL show_status
+generation_return:
+    POP {R0-R12, LR}
+    MOV PC, LR
+emit_char:
+    PUSH {R0-R12, LR}
+    MOV R4, [output_len]
+    MOV R1, =generated
+    ADD R1, R4
+    SAVE R0, [R1]
+    ADD R1, V1
+    MOV R2, V0
+    SAVE R2, [R1]
+    DIV R7, R4, V24
+    MUL R1, R7, V24
+    SUB R6, R4, R1
+    MUL R6, V6
+    ADD R6, V8
+    MUL R7, V10
+    ADD R7, V29
+    MOV R3, WHITE
+    MOV R12, BG
+    BL draw_char
+    ADD R4, V1
+    SAVE R4, [output_len]
+    MOV HEX, R4
+    POP {R0-R12, LR}
+    MOV PC, LR
+push_context:
+    PUSH {R0-R3}
+    MOV R1, R0
+    SUB R0, V62
+    CMP R1, " "
+    MOVEQ R0, V0
+    CMP R1, ","
+    MOVEQ R0, V1
+    CMP R1, "."
+    MOVEQ R0, V2
+    MOV R1, =context
+    MOV R2, V(CONTEXT - 1)
+shift_context:
+    ADD R1, V1
+    MOV R3, [R1]
+    SUB R1, V1
+    SAVE R3, [R1]
+    ADD R1, V1
+    SUB R2, V1
+    CMP R2, V0
+    BNE shift_context
+    SAVE R0, [R1]
+    POP {R0-R3}
+    MOV PC, LR
+infer:
+    MOV R1, =embedded
+    MOV R2, =context
+    MOV R3, V0
+gather_token:
+    MOV R0, [R2]
+    MOV R8, =embed_w
+    ADD R8, R0
+    MOV R9, V0
+copy_embedding:
+    MOV R0, [R8]
+    SAVE R0, [R1]
+    ADD R8, VOCAB
+    ADD R1, V1
+    ADD R9, V1
+    CMP R9, EMBED
+    BLT copy_embedding
+    ADD R2, V1
+    ADD R3, V1
+    CMP R3, CONTEXT
+    BLT gather_token
+    NPUCFG MODE, V(NPU_CONV)
+    MOV R0, =embedded
+    NPUCFG IN_BASE, R0
+    NPUCFG IN_C, INPUTS
+    MOV R0, =hidden_w
+    NPUCFG W_BASE, R0
+    MOV R0, =hidden_b
+    NPUCFG B_BASE, R0
+    MOV R0, =HIDDEN_MULT
+    NPUCFG MULT, R0
+    MOV R0, =hidden
+    NPUCFG OUT_BASE, R0
+    NPUCFG OUT_C, HIDDEN
+    NPUCFG SHIFT, HIDDEN_SHIFT
+    NPUCFG ACT_MIN, V0
+    NPUCFG ACT_MAX, V127
+    NPURUN R1
+    CMP R1, R0
+    BNE infer_error
+    MOV R0, =hidden
+    NPUCFG IN_BASE, R0
+    NPUCFG IN_C, HIDDEN
+    MOV R0, =output_w
+    NPUCFG W_BASE, R0
+    MOV R0, =output_b
+    NPUCFG B_BASE, R0
+    MOV R0, =LOGIT_MULT
+    NPUCFG MULT, R0
+    MOV R0, =logits
+    NPUCFG OUT_BASE, R0
+    NPUCFG OUT_C, VOCAB
+    NPUCFG SHIFT, LOGIT_SHIFT
+    NPUCFG ACT_MIN, V128
+    NPURUN R1
+    CMP R1, R0
+    BNE infer_error
+    NPUCFG MODE, V(NPU_ARGMAX)
+    MOV R0, =logits
+    NPUCFG IN_BASE, R0
+    NPURUN R0
+    MOV PC, LR
+infer_error:
+    MOV HEX, R1
+    MOV LE, V2
+    MOV R0, V-1
+    MOV PC, LR
+fill_rect:
+    PUSH {R0-R5}
+    ADD R2, R0
+    ADD R3, R1
+    MOV R4, R0
+fill_row:
+    MOV R0, R4
+fill_pixel:
+    PIXELNB R0, R1, R12
+    ADD R0, V1
+    CMP R0, R2
+    BLT fill_pixel
+    ADD R1, V1
+    CMP R1, R3
+    BLT fill_row
+    POP {R0-R5}
+    MOV PC, LR
+draw_string:
+    PUSH {R0, R1, R6, LR}
+    MOV R1, R0
+string_loop:
+    MOV R0, [R1]
+    CMP R0, V0
+    BEQ string_done
+    BL draw_char
+    ADD R1, V1
+    ADD R6, V6
+    CMP R6, V154
+    BLT string_loop
+string_done:
+    POP {R0, R1, R6, LR}
+    MOV PC, LR
+draw_char:
+    PUSH {R0-R12}
+    SUB R0, V32
+    MUL R0, V7
+    MOV R1, =font
+    ADD R1, R0
+    MOV R8, V0
+glyph_row:
+    MOV R9, V0
+    CMP R8, V7
+    MOVLT R9, [R1]
+    LSL R9, V1
+    MOV R10, V0
+glyph_pixel:
+    MOV R2, R12
+    TST R9, V32
+    MOVNE R2, R3
+    ADD R0, R6, R10
+    ADD R4, R7, R8
+    PIXELNB R0, R4, R2
+    LSL R9, V1
+    ADD R10, V1
+    CMP R10, V6
+    BLT glyph_pixel
+    ADD R1, V1
+    ADD R8, V1
+    CMP R8, V8
+    BLT glyph_row
+    POP {R0-R12}
+    MOV PC, LR

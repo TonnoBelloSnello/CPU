@@ -1,0 +1,3130 @@
+const TEX_BASE  = 0x8000
+const TEX_SIZE  = 1024
+const MAP_BASE  = 0x9000
+const SIN_BASE  = 0x9400
+const SKY_BASE  = 0x9600
+const ZBUF_BASE = 0x9660
+const SPR_BASE  = 0x9800
+const SPR_SIZE  = 1024
+const GUN_BASE  = 0xB000
+const ENT_BASE  = 0xB600
+const ORD_BASE  = 0xB800  # painter's-order list of entity indices
+const MARK_BASE = 0xB840  # minimap cells covered last frame
+const MARKN_BASE = 0xB890  # the cells covered this frame
+const MARKC_BASE = 0xB8E0  # their colours
+
+const FP_BIAS = 0x6600  # int<->fp16 magic-constant bias
+const FP_SIGN = 0x8000  # fp16 sign bit
+
+const LCG_MUL = 25173
+const LCG_ADD = 13849
+
+const MAX_ENT  = 28
+const ENT_SIZE = 16
+const MAX_MARK = 34
+
+const K_FREE = 0
+const K_IMP  = 1
+const K_MED  = 2
+const K_AMMO = 3
+const K_DEAD = 4
+const K_BALL = 5
+
+const SPR_IMP_A = 0
+const SPR_IMP_B = 1
+const SPR_DEAD  = 2
+const SPR_MED   = 3
+const SPR_AMMO  = 4
+const SPR_BALL  = 5
+
+const VIEW_H   = 88
+const HORIZON  = 44
+const BAND_Y   = 88
+const NOTCH_X0 = 75
+const NOTCH_X1 = 86
+const NOTCH_Y  = 80
+const GUN_X    = 64
+const GUN_Y    = 80
+const GUN_W    = 32
+const GUN_H    = 40
+
+const PANEL_BG = 73
+const PANEL_HI = 182
+const PANEL_ED = 146
+
+space:
+    posx  = 0000000000000000
+    posy  = 0000000000000000
+    pang  = 00000000
+
+    dirx  = 0000000000000000
+    diry  = 0000000000000000
+    plnx  = 0000000000000000
+    plny  = 0000000000000000
+
+    raydx = 0000000000000000
+    raydy = 0000000000000000
+    ddx   = 0000000000000000
+    ddy   = 0000000000000000
+    sdx   = 0000000000000000
+    sdy   = 0000000000000000
+    perpd = 0000000000000000
+    texst = 0000000000000000
+    texps = 0000000000000000
+    colx  = 0000000000000000
+    mapx  = 0000000000000000
+    mapy  = 0000000000000000
+    side  = 0000000000000000
+    texn  = 0000000000000000
+    texx  = 0000000000000000
+    dstart = 0000000000000000
+    dend  = 0000000000000000
+    lineh = 0000000000000000
+    ybot  = 0000000000000000
+
+    sent  = 0000000000000000
+    sdpt  = 0000000000000000
+    sltr  = 0000000000000000
+    shs   = 0000000000000000
+    svs   = 0000000000000000
+    shf   = 0000000000000000
+    sh    = 0000000000000000
+    sx0   = 0000000000000000
+    sy0   = 0000000000000000
+    sxa   = 0000000000000000
+    sxb   = 0000000000000000
+    sya   = 0000000000000000
+    syb   = 0000000000000000
+    sstep = 0000000000000000
+    stxp  = 0000000000000000
+    styp  = 0000000000000000
+    sbase = 0000000000000000
+    stex  = 00000000
+    sidx  = 00000000
+
+    ecur  = 0000000000000000
+    eidx  = 00000000
+    edx   = 0000000000000000
+    edy   = 0000000000000000
+    ed2   = 0000000000000000
+    evx   = 0000000000000000
+    evy   = 0000000000000000
+    losx  = 0000000000000000
+    losy  = 0000000000000000
+    losdx = 0000000000000000
+    losdy = 0000000000000000
+    losi  = 00000000
+    salloc = 0000000000000000
+    spawnn = 00000000
+    spawnk = 00000000
+    mkc    = 00000000
+
+    hswall = 0000000000000000
+    hsbest = 0000000000000000
+    hstgt  = 0000000000000000
+    hsrange = 0000000000000000
+
+    keys   = 00000000
+    pkeys  = 00000000
+    firing = 00000000
+    health = 00000000
+    ammo   = 00000000
+    kills  = 00000000
+    nimp   = 00000000
+    gstate = 00000000
+    level  = 00000000
+    tick   = 00000000
+    firecd = 00000000
+    flash  = 00000000
+    hurt   = 00000000
+    bob    = 00000000
+    bobph  = 00000000
+    nvis   = 00000000
+    nmark  = 00000000
+    nnew   = 00000000
+    seed   = 0000000000000000
+
+    shown_hp = 00000000
+    shown_am = 00000000
+    shown_fo = 00000000
+    shown_lv = 00000000
+
+    t_hp = "100"
+    t_am = "40"
+    t_fo = " 6"
+    t_lv = " 1"
+
+main:
+    MOV R11, =FP_BIAS
+
+    BL gen_sin
+    BL gen_tex
+    BL gen_spr
+    BL gen_gun
+    BL gen_sky
+
+    MOV R0, =7919
+    SAVEM R0, [seed]
+    MOV R0, V1
+    SAVE R0, [level]
+    MOV R0, V100
+    SAVE R0, [health]
+    MOV R0, V40
+    SAVE R0, [ammo]
+    BL new_level
+
+frame_loop:
+    BL read_input
+    BL update_world
+    BL setup_camera
+    BL calc_sprites
+    BL render
+    BL render_sprites
+    BL resolve_fire
+    BL draw_weapon
+    BL draw_hud
+    B frame_loop
+
+new_level:
+    PUSH {LR}
+    BL gen_map
+    BL spawn_ents
+
+    MOV R0, V1
+    ADD R0, R0, R11
+    FSUB R0, R0, F1536.0
+    FADD R0, R0, F0.5
+    SAVEM R0, [posx]
+    SAVEM R0, [posy]
+
+    MOV R0, V0
+    SAVE R0, [pang]
+    SAVE R0, [kills]
+    SAVE R0, [gstate]
+    SAVE R0, [firecd]
+    SAVE R0, [flash]
+    SAVE R0, [hurt]
+    SAVE R0, [nmark]
+    SAVE R0, [bob]
+    SAVE R0, [bobph]
+    SAVE R0, [firing]
+
+    BL hud_init
+    POP {PC}
+
+restart:
+    PUSH {LR}
+    MOV R0, [gstate]
+    CMP R0, V2
+    BEQ restart_next
+
+    MOV R0, V1
+    SAVE R0, [level]
+    MOV R0, V100
+    SAVE R0, [health]
+    MOV R0, V40
+    SAVE R0, [ammo]
+    B restart_go
+
+restart_next:
+    MOV R0, [level]
+    ADD R0, R0, V1
+    MIN R0, R0, V9
+    SAVE R0, [level]
+    MOV R0, [health]
+    ADD R0, R0, V25
+    MIN R0, R0, V100
+    SAVE R0, [health]
+    MOV R0, [ammo]
+    ADD R0, R0, V20
+    MIN R0, R0, V99
+    SAVE R0, [ammo]
+
+restart_go:
+    BL new_level
+    POP {PC}
+
+read_input:
+    PUSH {LR}
+
+    MOV R0, [keys]
+    SAVE R0, [pkeys]
+    WAITKNB R0, V15
+    SAVE R0, [keys]
+
+    MOV R1, [tick]
+    ADD R1, R1, V1
+    SAVE R1, [tick]
+
+    MOV R1, [gstate]
+    CMP R1, V0
+    BNE input_over
+
+    MOV R1, [pang]
+    TST R0, V1
+    ADDNE R1, R1, V1
+    TST R0, V8
+    SUBNE R1, R1, V1
+    AND R1, R1, V255
+    SAVE R1, [pang]
+
+    MOV R2, V0
+    AND R3, R0, V6
+    CMP R3, V6
+    MOVEQ R2, V1
+    SAVE R2, [firing]
+    POP {PC}
+
+input_over:
+    MOV R2, [pkeys]
+    CMP R2, V0
+    BNE input_over_done
+    CMP R0, V0
+    BEQ input_over_done
+    BL restart
+input_over_done:
+    POP {PC}
+
+update_world:
+    PUSH {LR}
+    MOV R0, [gstate]
+    CMP R0, V0
+    BNE update_world_done
+    BL update_player
+    BL update_ents
+    BL check_state
+update_world_done:
+    POP {PC}
+
+check_state:
+    MOV R0, [health]
+    CMP R0, V0
+    BEQ check_dead
+    MOV R0, [nimp]
+    CMP R0, V0
+    BEQ check_win
+    MOV PC, R14
+check_dead:
+    MOV R0, V1
+    SAVE R0, [gstate]
+    MOV PC, R14
+check_win:
+    MOV R0, V2
+    SAVE R0, [gstate]
+    MOV PC, R14
+
+update_player:
+    PUSH {LR}
+
+    MOV R0, [firing]
+    CMP R0, V0
+    BNE player_still
+    MOV R0, [keys]
+    TST R0, V2
+    BNE player_fwd
+    TST R0, V4
+    BNE player_back
+    B player_still
+
+player_fwd:
+    MOV R3, V1
+    B player_move
+player_back:
+    MOV R3, V0
+
+player_move:
+    MOV R0, [pang]
+    BL sin_lookup
+    MOV R4, R1
+    MOV R0, [pang]
+    ADD R0, R0, V64
+    AND R0, R0, V255
+    BL sin_lookup
+    MOV R5, R1
+
+    FMUL R4, R4, F0.06
+    FMUL R5, R5, F0.06
+    CMP R3, V1
+    BEQ player_apply
+    MOV R6, V0
+    FSUB R4, R6, R4
+    MOV R6, V0
+    FSUB R5, R6, R5
+
+player_apply:
+    MOVM R0, [posx]
+    FMUL R6, R5, F3.0
+    FADD R0, R0, R6
+    MOVM R1, [posy]
+    BL cell_at
+    CMP R2, V0
+    BNE player_skipx
+    MOVM R0, [posx]
+    FADD R0, R0, R5
+    SAVEM R0, [posx]
+player_skipx:
+
+    MOVM R0, [posx]
+    MOVM R1, [posy]
+    FMUL R6, R4, F3.0
+    FADD R1, R1, R6
+    BL cell_at
+    CMP R2, V0
+    BNE player_skipy
+    MOVM R1, [posy]
+    FADD R1, R1, R4
+    SAVEM R1, [posy]
+player_skipy:
+
+    MOV R0, [bobph]
+    ADD R0, R0, V1
+    AND R0, R0, V31
+    SAVE R0, [bobph]
+
+player_still:
+    POP {PC}
+
+cell_at:
+    FADD R6, R0, F1536.0
+    SUB R6, R6, R11
+    ADD R7, R6, R11
+    FSUB R7, R7, F1536.0
+    FCMP R7, R0
+    SUBGT R6, R6, V1
+
+    FADD R8, R1, F1536.0
+    SUB R8, R8, R11
+    ADD R7, R8, R11
+    FSUB R7, R7, F1536.0
+    FCMP R7, R1
+    SUBGT R8, R8, V1
+
+    MOV R2, V1
+    CMP R6, V31
+    BHI cell_at_done
+    CMP R8, V31
+    BHI cell_at_done
+    MOV R2, =MAP_BASE
+    LSL R7, R8, V5
+    ADD R7, R7, R6
+    ADD R7, R7, R2
+    MOV R2, [R7]
+cell_at_done:
+    MOV PC, R14
+
+floor_pair:
+    FADD R6, R0, F1536.0
+    SUB R6, R6, R11
+    ADD R7, R6, R11
+    FSUB R7, R7, F1536.0
+    FCMP R7, R0
+    SUBGT R6, R6, V1
+
+    FADD R8, R1, F1536.0
+    SUB R8, R8, R11
+    ADD R7, R8, R11
+    FSUB R7, R7, F1536.0
+    FCMP R7, R1
+    SUBGT R8, R8, V1
+    MOV PC, R14
+
+sin_lookup:
+    AND R1, R0, V255
+    MOV R2, =SIN_BASE
+    ADD R2, R2, R1 LSL V1
+    MOVM R1, [R2]
+    MOV PC, R14
+
+rand:
+    MOVM R0, [seed]
+    MOV R1, =LCG_MUL
+    MUL R0, R0, R1
+    MOV R1, =LCG_ADD
+    ADD R0, R0, R1
+    SAVEM R0, [seed]
+    MOV PC, R14
+
+setup_camera:
+    PUSH {LR}
+
+    MOV R0, [pang]
+    ADD R0, R0, V64
+    AND R0, R0, V255
+    BL sin_lookup
+    SAVEM R1, [dirx]
+
+    MOV R0, [pang]
+    BL sin_lookup
+    SAVEM R1, [diry]
+
+    MOVM R0, [diry]
+    FMUL R0, R0, F0.66
+    SAVEM R0, [plnx]
+
+    MOVM R0, [dirx]
+    FMUL R0, R0, F0.66
+    MOV R1, V0
+    FSUB R0, R1, R0
+    SAVEM R0, [plny]
+
+    POP {PC}
+
+update_ents:
+    PUSH {LR}
+    MOV R0, V0
+    SAVE R0, [eidx]
+ent_loop:
+    MOV R0, [eidx]
+    LSL R0, V4
+    MOV R1, =ENT_BASE
+    ADD R0, R0, R1
+    SAVEM R0, [ecur]
+    MOV R1, [R0]
+    CMP R1, K_IMP
+    BEQ ent_is_imp
+    CMP R1, K_BALL
+    BEQ ent_is_ball
+    CMP R1, K_MED
+    BEQ ent_is_pick
+    CMP R1, K_AMMO
+    BEQ ent_is_pick
+    B ent_next
+ent_is_imp:
+    BL imp_step
+    B ent_next
+ent_is_ball:
+    BL ball_step
+    B ent_next
+ent_is_pick:
+    BL pick_step
+ent_next:
+    MOV R0, [eidx]
+    ADD R0, R0, V1
+    SAVE R0, [eidx]
+    CMP R0, MAX_ENT
+    BLT ent_loop
+    POP {PC}
+
+ent_vec:
+    MOVM R0, [ecur]
+    ADD R1, R0, V4
+    MOVM R2, [R1]
+    ADD R1, R0, V6
+    MOVM R3, [R1]
+    MOVM R4, [posx]
+    MOVM R5, [posy]
+    FSUB R4, R4, R2
+    FSUB R5, R5, R3
+    SAVEM R4, [edx]
+    SAVEM R5, [edy]
+    FMUL R6, R4, R4
+    FMUL R7, R5, R5
+    FADD R6, R6, R7
+    SAVEM R6, [ed2]
+    MOV PC, R14
+
+aim_vec:
+    MOVM R0, [edx]
+    MOVM R1, [edy]
+    MOV R2, =FP_SIGN
+    BIC R3, R0, R2
+    BIC R4, R1, R2
+    FCMP R3, R4
+    BGE aim_xbig
+    FMUL R3, R3, F0.5
+    FADD R5, R4, R3
+    B aim_len
+aim_xbig:
+    FMUL R4, R4, F0.5
+    FADD R5, R3, R4
+aim_len:
+    FCMP R5, F0.1
+    BGE aim_ok
+    FMOV R5, F0.1
+aim_ok:
+    FDIV R7, R7, R5
+    FMUL R0, R0, R7
+    FMUL R1, R1, R7
+    MOV PC, R14
+
+ent_los:
+    PUSH {LR}
+    MOVM R8, [ecur]
+    ADD R9, R8, V4
+    MOVM R0, [R9]
+    SAVEM R0, [losx]
+    ADD R9, R8, V6
+    MOVM R1, [R9]
+    SAVEM R1, [losy]
+
+    MOVM R2, [posx]
+    FSUB R2, R2, R0
+    FMUL R2, R2, F0.0833333
+    SAVEM R2, [losdx]
+    MOVM R3, [posy]
+    FSUB R3, R3, R1
+    FMUL R3, R3, F0.0833333
+    SAVEM R3, [losdy]
+
+    MOV R4, V0
+    SAVE R4, [losi]
+los_loop:
+    MOVM R0, [losx]
+    MOVM R2, [losdx]
+    FADD R0, R0, R2
+    SAVEM R0, [losx]
+    MOVM R1, [losy]
+    MOVM R3, [losdy]
+    FADD R1, R1, R3
+    SAVEM R1, [losy]
+    BL cell_at
+    CMP R2, V0
+    BNE los_blocked
+    MOV R4, [losi]
+    ADD R4, R4, V1
+    SAVE R4, [losi]
+    CMP R4, V11
+    BLT los_loop
+    MOV R0, V1
+    POP {PC}
+los_blocked:
+    MOV R0, V0
+    POP {PC}
+
+imp_step:
+    PUSH {LR}
+    BL ent_vec
+
+    MOVM R8, [ecur]
+    ADD R9, R8, V3
+    MOV R0, [R9]
+    CMP R0, V0
+    SUBNE R0, R0, V1
+    SAVE R0, [R9]
+
+    ADD R9, R8, V2
+    MOV R1, [R9]
+    CMP R1, V0
+    BNE imp_awake
+
+    MOVM R0, [ed2]
+    FCMP R0, F64.0
+    BGE imp_done
+    BL ent_los
+    CMP R0, V0
+    BEQ imp_done
+    MOVM R8, [ecur]
+    ADD R9, R8, V2
+    MOV R0, V1
+    SAVE R0, [R9]
+
+imp_awake:
+    MOVM R0, [ed2]
+    FCMP R0, F2.2
+    BLT imp_melee
+
+    BL imp_chase
+
+    MOVM R8, [ecur]
+    ADD R9, R8, V3
+    MOV R0, [R9]
+    CMP R0, V0
+    BNE imp_done
+    MOVM R0, [ed2]
+    FCMP R0, F81.0
+    BGE imp_done
+    BL ent_los
+    CMP R0, V0
+    BEQ imp_done
+    BL spawn_ball
+    MOVM R8, [ecur]
+    ADD R9, R8, V3
+    MOV R0, V45
+    SAVE R0, [R9]
+    B imp_done
+
+imp_melee:
+    MOVM R8, [ecur]
+    ADD R9, R8, V3
+    MOV R0, [R9]
+    CMP R0, V0
+    BNE imp_done
+    MOV R0, V26
+    SAVE R0, [R9]
+    MOV R0, V7
+    BL hurt_player
+imp_done:
+    POP {PC}
+
+imp_chase:
+    PUSH {LR}
+    MOV R7, [level]
+    ADD R7, R7, R11
+    FSUB R7, R7, F1536.0
+    FMUL R7, R7, F0.004
+    FADD R7, R7, F0.026
+    FCMP R7, F0.055
+    BLE imp_speed_ok
+    FMOV R7, F0.055
+imp_speed_ok:
+    BL aim_vec
+    SAVEM R0, [evx]
+    SAVEM R1, [evy]
+
+    MOVM R8, [ecur]
+    ADD R9, R8, V4
+    MOVM R0, [R9]
+    MOVM R2, [evx]
+    FADD R0, R0, R2
+    ADD R9, R8, V6
+    MOVM R1, [R9]
+    BL cell_at
+    CMP R2, V0
+    BNE imp_skipx
+    MOVM R8, [ecur]
+    ADD R9, R8, V4
+    SAVEM R0, [R9]
+imp_skipx:
+
+    MOVM R8, [ecur]
+    ADD R9, R8, V4
+    MOVM R0, [R9]
+    ADD R9, R8, V6
+    MOVM R1, [R9]
+    MOVM R2, [evy]
+    FADD R1, R1, R2
+    BL cell_at
+    CMP R2, V0
+    BNE imp_skipy
+    MOVM R8, [ecur]
+    ADD R9, R8, V6
+    SAVEM R1, [R9]
+imp_skipy:
+    POP {PC}
+
+ball_step:
+    PUSH {LR}
+    MOVM R8, [ecur]
+    ADD R9, R8, V3
+    MOV R0, [R9]
+    SUB R0, R0, V1
+    SAVE R0, [R9]
+    CMP R0, V0
+    BEQ ball_kill
+
+    ADD R9, R8, V4
+    MOVM R0, [R9]
+    ADD R9, R8, V8
+    MOVM R2, [R9]
+    FADD R0, R0, R2
+    ADD R9, R8, V6
+    MOVM R1, [R9]
+    ADD R9, R8, V10
+    MOVM R2, [R9]
+    FADD R1, R1, R2
+
+    MOVM R8, [ecur]
+    ADD R9, R8, V4
+    SAVEM R0, [R9]
+    ADD R9, R8, V6
+    SAVEM R1, [R9]
+
+    BL cell_at
+    CMP R2, V0
+    BNE ball_kill
+
+    BL ent_vec
+    MOVM R0, [ed2]
+    FCMP R0, F0.30
+    BGE ball_done
+    MOV R0, V11
+    BL hurt_player
+ball_kill:
+    MOVM R8, [ecur]
+    MOV R0, V0
+    SAVE R0, [R8]
+ball_done:
+    POP {PC}
+
+pick_step:
+    PUSH {LR}
+    BL ent_vec
+    MOVM R0, [ed2]
+    FCMP R0, F0.36
+    BGE pick_done
+    MOVM R0, [ecur]
+    MOV R1, [R0]
+    MOV R2, V0
+    SAVE R2, [R0]
+    CMP R1, K_MED
+    BEQ pick_med
+    MOV R3, [ammo]
+    ADD R3, R3, V15
+    MIN R3, R3, V99
+    SAVE R3, [ammo]
+    B pick_done
+pick_med:
+    MOV R3, [health]
+    ADD R3, R3, V25
+    MIN R3, R3, V100
+    SAVE R3, [health]
+pick_done:
+    POP {PC}
+
+hurt_player:
+    MOV R1, [health]
+    SUB R1, R1, R0
+    MAX R1, R1, V0
+    SAVE R1, [health]
+    MOV R1, V6
+    SAVE R1, [hurt]
+    MOV PC, R14
+
+ent_alloc:
+    MOV R1, =ENT_BASE
+    MOV R2, V0
+alloc_loop:
+    MOV R3, [R1]
+    CMP R3, V0
+    BEQ alloc_found
+    ADD R1, R1, ENT_SIZE
+    ADD R2, R2, V1
+    CMP R2, MAX_ENT
+    BLT alloc_loop
+    MOV R0, V0
+    MOV PC, R14
+alloc_found:
+    MOV R0, R1
+    MOV PC, R14
+
+spawn_ball:
+    PUSH {LR}
+    BL ent_alloc
+    CMP R0, V0
+    BEQ ball_spawn_done
+    SAVEM R0, [salloc]
+
+    MOV R1, K_BALL
+    SAVE R1, [R0]
+    ADD R1, R0, V3
+    MOV R2, V90
+    SAVE R2, [R1]
+
+    MOVM R8, [ecur]
+    ADD R9, R8, V4
+    MOVM R2, [R9]
+    ADD R1, R0, V4
+    SAVEM R2, [R1]
+    ADD R9, R8, V6
+    MOVM R2, [R9]
+    ADD R1, R0, V6
+    SAVEM R2, [R1]
+
+    FMOV R7, F0.13
+    BL aim_vec
+    MOVM R2, [salloc]
+    ADD R3, R2, V8
+    SAVEM R0, [R3]
+    ADD R3, R2, V10
+    SAVEM R1, [R3]
+ball_spawn_done:
+    POP {PC}
+
+spawn_ents:
+    PUSH {LR}
+    MOV R0, =ENT_BASE
+    MOV R1, V0
+spawn_clear:
+    MOV R2, V0
+    SAVE R2, [R0]
+    ADD R0, R0, ENT_SIZE
+    ADD R1, R1, V1
+    CMP R1, MAX_ENT
+    BLT spawn_clear
+
+    MOV R0, [level]
+    SUB R0, R0, V1
+    LSL R0, V1
+    ADD R0, R0, V6
+    MIN R0, R0, V12
+    SAVE R0, [nimp]
+    SAVE R0, [spawnn]
+    MOV R0, K_IMP
+    SAVE R0, [spawnk]
+    BL spawn_batch
+
+    MOV R0, V3
+    SAVE R0, [spawnn]
+    MOV R0, K_MED
+    SAVE R0, [spawnk]
+    BL spawn_batch
+
+    MOV R0, V4
+    SAVE R0, [spawnn]
+    MOV R0, K_AMMO
+    SAVE R0, [spawnk]
+    BL spawn_batch
+    POP {PC}
+
+spawn_batch:
+    PUSH {LR}
+batch_loop:
+    MOV R0, [spawnn]
+    CMP R0, V0
+    BEQ batch_done
+    SUB R0, R0, V1
+    SAVE R0, [spawnn]
+
+    BL ent_alloc
+    CMP R0, V0
+    BEQ batch_done
+    SAVEM R0, [salloc]
+    BL place_random
+
+    MOVM R2, [salloc]
+    MOV R3, [spawnk]
+    SAVE R3, [R2]
+    MOV R3, V100
+    ADD R4, R2, V1
+    SAVE R3, [R4]
+    MOV R3, V0
+    ADD R4, R2, V2
+    SAVE R3, [R4]
+    ADD R4, R2, V3
+    SAVE R3, [R4]
+
+    ADD R0, R0, R11
+    FSUB R0, R0, F1536.0
+    FADD R0, R0, F0.5
+    ADD R4, R2, V4
+    SAVEM R0, [R4]
+    ADD R1, R1, R11
+    FSUB R1, R1, F1536.0
+    FADD R1, R1, F0.5
+    ADD R4, R2, V6
+    SAVEM R1, [R4]
+    B batch_loop
+batch_done:
+    POP {PC}
+
+place_random:
+    PUSH {LR}
+    MOV R5, V0
+place_try:
+    BL rand
+    LSR R6, R0, V5
+    AND R6, R6, V31
+    CMP R6, V1
+    BLT place_next
+    CMP R6, V30
+    BGT place_next
+    BL rand
+    LSR R7, R0, V5
+    AND R7, R7, V31
+    CMP R7, V1
+    BLT place_next
+    CMP R7, V30
+    BGT place_next
+
+    LSL R8, R7, V5
+    ADD R8, R8, R6
+    MOV R9, =MAP_BASE
+    ADD R9, R9, R8
+    MOV R9, [R9]
+    CMP R9, V0
+    BNE place_next
+    SUB R8, R6, V1
+    SUB R9, R7, V1
+    ADD R8, R8, R9
+    CMP R8, V9
+    BLT place_next
+    MOV R0, R6
+    MOV R1, R7
+    POP {PC}
+place_next:
+    ADD R5, R5, V1
+    CMP R5, V48
+    BLT place_try
+
+    MOV R7, V1
+place_scan_y:
+    MOV R6, V1
+place_scan_x:
+    LSL R8, R7, V5
+    ADD R8, R8, R6
+    MOV R9, =MAP_BASE
+    ADD R9, R9, R8
+    MOV R9, [R9]
+    CMP R9, V0
+    BNE place_scan_next
+    SUB R8, R6, V1
+    SUB R9, R7, V1
+    ADD R8, R8, R9
+    CMP R8, V9
+    BLT place_scan_next
+    MOV R0, R6
+    MOV R1, R7
+    POP {PC}
+place_scan_next:
+    ADD R6, R6, V1
+    CMP R6, V31
+    BLT place_scan_x
+    ADD R7, R7, V1
+    CMP R7, V31
+    BLT place_scan_y
+    MOV R0, V1
+    MOV R1, V2
+    POP {PC}
+
+render:
+    PUSH {LR}
+    MOV R0, V0
+    SAVEM R0, [colx]
+
+col_loop:
+    MOVM R0, [colx]
+    ADD R0, R0, R11
+    FSUB R0, R0, F1536.0
+    FMUL R0, R0, F0.0125
+    FSUB R0, R0, F1.0
+
+    MOVM R2, [dirx]
+    MOVM R1, [plnx]
+    FMUL R1, R1, R0
+    FADD R1, R1, R2
+    SAVEM R1, [raydx]
+
+    MOVM R3, [diry]
+    MOVM R2, [plny]
+    FMUL R2, R2, R0
+    FADD R2, R2, R3
+    SAVEM R2, [raydy]
+
+    MOV R6, =FP_SIGN
+    FMOV R5, F1.0
+    MOVM R3, [raydx]
+    BIC R3, R3, R6
+    FCMP R3, F0.01
+    BLE ddx_big
+    MOVM R4, [raydx]
+    FDIV R4, R5, R4
+    BIC R4, R4, R6
+    B ddx_done
+ddx_big:
+    FMOV R4, F999.0
+ddx_done:
+    SAVEM R4, [ddx]
+
+    MOVM R3, [raydy]
+    BIC R3, R3, R6
+    FCMP R3, F0.01
+    BLE ddy_big
+    MOVM R4, [raydy]
+    FDIV R4, R5, R4
+    BIC R4, R4, R6
+    B ddy_done
+ddy_big:
+    FMOV R4, F999.0
+ddy_done:
+    SAVEM R4, [ddy]
+
+    MOVM R0, [posx]
+    MOVM R1, [posy]
+    BL floor_pair
+    SAVEM R6, [mapx]
+    SAVEM R8, [mapy]
+
+    MOVM R0, [raydx]
+    CMP R0, V0
+    BLT sdx_neg
+    MOV R2, V1
+    SAVEM R2, [side]
+    MOVM R4, [posx]
+    MOVM R3, [mapx]
+    ADD R3, R3, V1
+    ADD R3, R3, R11
+    FSUB R3, R3, F1536.0
+    FSUB R3, R3, R4
+    B sdx_scale
+sdx_neg:
+    MOV R2, V0
+    SUB R2, R2, V1
+    SAVEM R2, [side]
+    MOVM R4, [posx]
+    MOVM R3, [mapx]
+    ADD R3, R3, R11
+    FSUB R5, R3, F1536.0
+    FSUB R3, R4, R5
+sdx_scale:
+    MOVM R5, [ddx]
+    FMUL R3, R3, R5
+    SAVEM R3, [sdx]
+    MOVM R2, [side]
+    SAVEM R2, [texn]
+
+    MOVM R0, [raydy]
+    CMP R0, V0
+    BLT sdy_neg
+    MOV R2, V1
+    SAVEM R2, [side]
+    MOVM R4, [posy]
+    MOVM R3, [mapy]
+    ADD R3, R3, V1
+    ADD R3, R3, R11
+    FSUB R3, R3, F1536.0
+    FSUB R3, R3, R4
+    B sdy_scale
+sdy_neg:
+    MOV R2, V0
+    SUB R2, R2, V1
+    SAVEM R2, [side]
+    MOVM R4, [posy]
+    MOVM R3, [mapy]
+    ADD R3, R3, R11
+    FSUB R5, R3, F1536.0
+    FSUB R3, R4, R5
+sdy_scale:
+    MOVM R5, [ddy]
+    FMUL R3, R3, R5
+    SAVEM R3, [sdy]
+
+    MOVM R2, [sdx]
+    MOVM R3, [sdy]
+    MOVM R4, [ddx]
+    MOVM R5, [ddy]
+    MOVM R6, [mapx]
+    MOVM R7, [mapy]
+    MOVM R8, [texn]
+    MOVM R9, [side]
+    MOV R12, =MAP_BASE
+
+dda_loop:
+    FCMP R2, R3
+    BGE dda_stepy
+dda_stepx:
+    FADD R2, R2, R4
+    ADD R6, R6, R8
+    MOV R10, V0
+    B dda_probe
+dda_stepy:
+    FADD R3, R3, R5
+    ADD R7, R7, R9
+    MOV R10, V1
+dda_probe:
+    CMP R6, V31
+    BHI dda_escape
+    CMP R7, V31
+    BHI dda_escape
+    LSL R0, R7, V5
+    ADD R0, R0, R6
+    ADD R0, R0, R12
+    MOV R1, [R0]
+    CMP R1, V0
+    BEQ dda_loop
+    B dda_hit
+dda_escape:
+    MOV R1, V1
+dda_hit:
+
+    SAVEM R1, [texn]
+    SAVEM R10, [side]
+    SAVEM R6, [mapx]
+    SAVEM R7, [mapy]
+
+    CMP R10, V0
+    BNE perp_y
+    FSUB R2, R2, R4
+    SAVEM R2, [perpd]
+    B perp_done
+perp_y:
+    FSUB R3, R3, R5
+    SAVEM R3, [perpd]
+perp_done:
+
+    MOVM R0, [perpd]
+    FCMP R0, F0.02
+    BGE perp_ok
+    FMOV R0, F0.02
+    SAVEM R0, [perpd]
+perp_ok:
+
+    MOVM R0, [colx]
+    MOV R1, =ZBUF_BASE
+    ADD R1, R1, R0 LSL V1
+    MOVM R2, [perpd]
+    SAVEM R2, [R1]
+
+    BL wall_slice
+
+    MOVM R0, [colx]
+    ADD R0, R0, V1
+    SAVEM R0, [colx]
+    CMP R0, V160
+    BLT col_loop
+
+    POP {PC}
+
+wall_slice:
+    PUSH {LR}
+
+    MOVM R0, [colx]
+    MOV R2, BAND_Y
+    CMP R0, NOTCH_X0
+    BLT ybot_ready
+    CMP R0, NOTCH_X1
+    BGE ybot_ready
+    MOV R2, NOTCH_Y
+ybot_ready:
+    SAVEM R2, [ybot]
+
+    MOVM R1, [perpd]
+    FMOV R0, F88.0
+    FDIV R0, R0, R1
+    FCMP R0, F400.0
+    BLE lineh_ok
+    FMOV R0, F400.0
+lineh_ok:
+    SAVEM R0, [lineh]
+
+    MOVM R3, [lineh]
+    FMOV R2, F32.0
+    FDIV R2, R2, R3
+    SAVEM R2, [texst]
+
+    MOVM R0, [lineh]
+    FMUL R0, R0, F0.5
+    FMOV R1, F44.0
+    FSUB R1, R1, R0
+    FADD R1, R1, F1536.0
+    SUB R1, R1, R11
+    MAX R1, R1, V0
+    SAVEM R1, [dstart]
+
+    MOVM R0, [lineh]
+    FMUL R0, R0, F0.5
+    FMOV R1, F44.0
+    FADD R1, R1, R0
+    FADD R1, R1, F1536.0
+    SUB R1, R1, R11
+    SAVEM R1, [dend]
+
+    MOVM R0, [side]
+    CMP R0, V0
+    BNE wallx_y
+    MOVM R3, [raydy]
+    MOVM R2, [perpd]
+    MOVM R1, [posy]
+    FMUL R2, R2, R3
+    FADD R1, R1, R2
+    B wallx_done
+wallx_y:
+    MOVM R3, [raydx]
+    MOVM R2, [perpd]
+    MOVM R1, [posx]
+    FMUL R2, R2, R3
+    FADD R1, R1, R2
+wallx_done:
+    FADD R4, R1, F1536.0
+    SUB R4, R4, R11
+    ADD R5, R4, R11
+    FSUB R5, R5, F1536.0
+    FCMP R5, R1
+    SUBGT R4, R4, V1
+    ADD R5, R4, R11
+    FSUB R5, R5, F1536.0
+    FSUB R1, R1, R5
+
+    FMUL R1, R1, F32.0
+    FADD R1, R1, F1536.0
+    SUB R1, R1, R11
+    AND R1, R1, V31
+
+    MOVM R2, [side]
+    CMP R2, V0
+    BNE texflip_y
+    MOVM R3, [raydx]
+    CMP R3, V0
+    BLT texflip_done
+    RSB R1, R1, V31
+    B texflip_done
+texflip_y:
+    MOVM R3, [raydy]
+    CMP R3, V0
+    BGE texflip_done
+    RSB R1, R1, V31
+texflip_done:
+    SAVEM R1, [texx]
+
+    MOVM R1, [lineh]
+    MOVM R0, [dstart]
+    ADD R0, R0, R11
+    FSUB R0, R0, F1536.0
+    FSUB R0, R0, F44.0
+    FMUL R1, R1, F0.5
+    FADD R0, R0, R1
+    MOVM R1, [texst]
+    FMUL R0, R0, R1
+    SAVEM R0, [texps]
+
+    BL paint_column
+    POP {PC}
+
+paint_column:
+    MOVM R0, [colx]
+    MOVM R2, [dstart]
+    MOVM R3, [ybot]
+    MIN R2, R2, R3
+    MOV R1, V0
+    MOV R7, =SKY_BASE
+
+ceil_loop:
+    CMP R1, R2
+    BGE ceil_done
+    ADD R4, R7, R1
+    MOV R5, [R4]
+    PIXELNB R0, R1, R5
+    ADD R1, R1, V1
+    B ceil_loop
+ceil_done:
+
+    MOVM R4, [texx]
+    MOV R5, =TEX_BASE
+    MOVM R3, [texn]
+    SUB R3, R3, V1
+    AND R3, R3, V3
+    LSL R8, R3, V10
+    ADD R8, R8, R4 LSL V5
+    ADD R8, R8, R5
+
+    MOVM R2, [dend]
+    MOVM R3, [ybot]
+    MIN R2, R2, R3
+    MOVM R9, [texps]
+    MOVM R6, [texst]
+
+wall_loop:
+    CMP R1, R2
+    BGE wall_done
+    FADD R3, R9, F1536.0
+    SUB R3, R3, R11
+    AND R3, R3, V31
+    ADD R4, R8, R3
+    MOV R5, [R4]
+
+    MOVM R4, [side]
+    CMP R4, V0
+    BEQ wall_plot
+    AND R4, R5, V218
+    LSR R5, R4, V1
+wall_plot:
+    PIXELNB R0, R1, R5
+    FADD R9, R9, R6
+    ADD R1, R1, V1
+    B wall_loop
+wall_done:
+
+    MOVM R2, [ybot]
+floor_loop:
+    CMP R1, R2
+    BGE floor_done
+    ADD R4, R7, R1
+    MOV R5, [R4]
+    PIXELNB R0, R1, R5
+    ADD R1, R1, V1
+    B floor_loop
+floor_done:
+    MOV PC, R14
+
+calc_sprites:
+    PUSH {LR}
+    MOV R0, V0
+    SAVE R0, [nvis]
+    SAVE R0, [eidx]
+
+vis_loop:
+    MOV R0, [eidx]
+    LSL R0, V4
+    MOV R1, =ENT_BASE
+    ADD R0, R0, R1
+    MOV R1, [R0]
+    CMP R1, V0
+    BEQ vis_next
+
+    ADD R2, R0, V4
+    MOVM R3, [R2]
+    MOVM R4, [posx]
+    FSUB R3, R3, R4
+    ADD R2, R0, V6
+    MOVM R5, [R2]
+    MOVM R6, [posy]
+    FSUB R5, R5, R6
+
+    MOVM R7, [dirx]
+    MOVM R8, [diry]
+    FMUL R9, R7, R3
+    FMUL R10, R8, R5
+    FADD R9, R9, R10
+    ADD R2, R0, V12
+    SAVEM R9, [R2]
+
+    FMUL R10, R8, R3
+    FMUL R12, R7, R5
+    FSUB R10, R10, R12
+    FMUL R10, R10, F1.515152
+    ADD R2, R0, V14
+    SAVEM R10, [R2]
+
+    FCMP R9, F0.3
+    BLE vis_next
+    FCMP R9, F26.0
+    BGE vis_next
+
+    MOV R1, [nvis]
+    MOV R2, =ORD_BASE
+    ADD R2, R2, R1
+    MOV R3, [eidx]
+    SAVE R3, [R2]
+    ADD R1, R1, V1
+    SAVE R1, [nvis]
+
+vis_next:
+    MOV R0, [eidx]
+    ADD R0, R0, V1
+    SAVE R0, [eidx]
+    CMP R0, MAX_ENT
+    BLT vis_loop
+
+    MOV R0, V0
+sort_i:
+    MOV R1, [nvis]
+    SUB R1, R1, V1
+    CMP R0, R1
+    BGE sort_done
+    MOV R2, R0
+    MOV R3, R0
+    ADD R3, R3, V1
+sort_j:
+    MOV R4, [nvis]
+    CMP R3, R4
+    BGE sort_swap
+
+    MOV R5, =ORD_BASE
+    ADD R6, R5, R3
+    MOV R6, [R6]
+    LSL R6, V4
+    MOV R7, =ENT_BASE
+    ADD R6, R6, R7
+    ADD R6, R6, V12
+    MOVM R6, [R6]
+
+    MOV R5, =ORD_BASE
+    ADD R7, R5, R2
+    MOV R7, [R7]
+    LSL R7, V4
+    MOV R8, =ENT_BASE
+    ADD R7, R7, R8
+    ADD R7, R7, V12
+    MOVM R7, [R7]
+
+    FCMP R6, R7
+    MOVGT R2, R3
+    ADD R3, R3, V1
+    B sort_j
+
+sort_swap:
+    MOV R5, =ORD_BASE
+    ADD R6, R5, R0
+    ADD R7, R5, R2
+    MOV R8, [R6]
+    MOV R9, [R7]
+    SAVE R9, [R6]
+    SAVE R8, [R7]
+    ADD R0, R0, V1
+    B sort_i
+sort_done:
+    POP {PC}
+
+render_sprites:
+    PUSH {LR}
+    MOV R0, V0
+    SAVE R0, [sidx]
+sprite_loop:
+    MOV R0, [sidx]
+    MOV R1, [nvis]
+    CMP R0, R1
+    BGE sprite_all_done
+    MOV R2, =ORD_BASE
+    ADD R2, R2, R0
+    MOV R3, [R2]
+    LSL R3, V4
+    MOV R4, =ENT_BASE
+    ADD R3, R3, R4
+    SAVEM R3, [sent]
+    BL draw_sprite
+    MOV R0, [sidx]
+    ADD R0, R0, V1
+    SAVE R0, [sidx]
+    B sprite_loop
+sprite_all_done:
+    POP {PC}
+
+draw_sprite:
+    PUSH {LR}
+    MOVM R0, [sent]
+    MOV R1, [R0]
+    ADD R2, R0, V12
+    MOVM R3, [R2]
+    SAVEM R3, [sdpt]
+    ADD R2, R0, V14
+    MOVM R4, [R2]
+    SAVEM R4, [sltr]
+
+    CMP R1, K_IMP
+    BEQ attr_imp
+    CMP R1, K_MED
+    BEQ attr_med
+    CMP R1, K_AMMO
+    BEQ attr_ammo
+    CMP R1, K_DEAD
+    BEQ attr_dead
+    FMOV R5, F30.0
+    FMOV R6, F6.0
+    MOV R7, SPR_BALL
+    B attr_done
+attr_imp:
+    FMOV R5, F88.0
+    FMOV R6, F0.0
+    MOV R7, [tick]
+    LSR R7, V3
+    LSR R8, R0, V4
+    ADD R7, R7, R8
+    AND R7, R7, V1
+    B attr_done
+attr_med:
+    FMOV R5, F40.0
+    FMOV R6, F30.0
+    MOV R7, SPR_MED
+    B attr_done
+attr_ammo:
+    FMOV R5, F40.0
+    FMOV R6, F30.0
+    MOV R7, SPR_AMMO
+    B attr_done
+attr_dead:
+    FMOV R5, F46.0
+    FMOV R6, F22.0
+    MOV R7, SPR_DEAD
+attr_done:
+    SAVEM R5, [shs]
+    SAVEM R6, [svs]
+    SAVE R7, [stex]
+
+    MOVM R3, [sdpt]
+    MOVM R5, [shs]
+    FDIV R5, R5, R3
+    FCMP R5, F300.0
+    BLE size_hi_ok
+    FMOV R5, F300.0
+size_hi_ok:
+    FCMP R5, F2.0
+    BGE size_lo_ok
+    FMOV R5, F2.0
+size_lo_ok:
+    SAVEM R5, [shf]
+
+    FMOV R0, F32.0
+    FDIV R0, R0, R5
+    SAVEM R0, [sstep]
+
+    FADD R6, R5, F1536.0
+    SUB R6, R6, R11
+    SAVEM R6, [sh]
+
+    MOVM R7, [svs]
+    MOVM R3, [sdpt]
+    FDIV R7, R7, R3
+    FADD R7, R7, F1536.0
+    SUB R7, R7, R11
+    ADD R7, R7, HORIZON
+    MOVM R6, [sh]
+    LSR R8, R6, V1
+    SUB R7, R7, R8
+    SAVEM R7, [sy0]
+
+    MOVM R0, [sltr]
+    FMUL R0, R0, F80.0
+    MOVM R3, [sdpt]
+    FDIV R0, R0, R3
+    FCMP R0, F400.0
+    BLE screen_x_hi
+    FMOV R0, F400.0
+screen_x_hi:
+    FCMP R0, F-400.0
+    BGE screen_x_lo
+    FMOV R0, F-400.0
+screen_x_lo:
+    FADD R0, R0, F1536.0
+    SUB R0, R0, R11
+    ADD R0, R0, V80
+    MOVM R6, [sh]
+    LSR R8, R6, V1
+    SUB R0, R0, R8
+    SAVEM R0, [sx0]
+
+    MOV R1, R0
+    MAX R1, R1, V0
+    SAVEM R1, [sxa]
+    ADD R2, R0, R6
+    MIN R2, R2, V160
+    SAVEM R2, [sxb]
+    CMP R1, R2
+    BGE sprite_skip
+
+    MOVM R3, [sy0]
+    MOV R4, R3
+    MAX R4, R4, V0
+    SAVEM R4, [sya]
+    ADD R5, R3, R6
+    MIN R5, R5, BAND_Y
+    SAVEM R5, [syb]
+    CMP R4, R5
+    BGE sprite_skip
+
+    MOVM R8, [sstep]
+    SUB R7, R1, R0
+    ADD R7, R7, R11
+    FSUB R7, R7, F1536.0
+    FMUL R7, R7, R8
+    SAVEM R7, [stxp]
+
+    MOVM R3, [sy0]
+    SUB R7, R4, R3
+    ADD R7, R7, R11
+    FSUB R7, R7, F1536.0
+    FMUL R7, R7, R8
+    SAVEM R7, [styp]
+
+    MOV R0, [stex]
+    LSL R0, V10
+    MOV R1, =SPR_BASE
+    ADD R0, R0, R1
+    SAVEM R0, [sbase]
+
+    BL sprite_cols
+sprite_skip:
+    POP {PC}
+
+sprite_cols:
+    MOVM R0, [sxa]
+    MOVM R1, [sxb]
+    MOVM R2, [stxp]
+    MOVM R3, [sstep]
+    MOVM R10, [sbase]
+    MOVM R12, [sdpt]
+
+scol_loop:
+    CMP R0, R1
+    BGE scol_done
+    MOV R8, =ZBUF_BASE
+    ADD R8, R8, R0 LSL V1
+    MOVM R9, [R8]
+    FCMP R12, R9
+    BGE scol_next
+
+    FADD R8, R2, F1536.0
+    SUB R8, R8, R11
+    AND R8, R8, V31
+    LSL R4, R8, V5
+    ADD R4, R4, R10
+
+    MOVM R5, [sya]
+    MOVM R6, [syb]
+    MOVM R7, [styp]
+srow_loop:
+    CMP R5, R6
+    BGE scol_next
+    FADD R8, R7, F1536.0
+    SUB R8, R8, R11
+    AND R8, R8, V31
+    ADD R8, R8, R4
+    MOV R9, [R8]
+    CMP R9, V0
+    PIXELNBNE R0, R5, R9
+    FADD R7, R7, R3
+    ADD R5, R5, V1
+    B srow_loop
+
+scol_next:
+    FADD R2, R2, R3
+    ADD R0, R0, V1
+    B scol_loop
+scol_done:
+    MOV PC, R14
+
+resolve_fire:
+    PUSH {LR}
+
+    MOV R0, [firecd]
+    CMP R0, V0
+    SUBNE R0, R0, V1
+    SAVE R0, [firecd]
+    MOV R0, [flash]
+    CMP R0, V0
+    SUBNE R0, R0, V1
+    SAVE R0, [flash]
+    MOV R0, [hurt]
+    CMP R0, V0
+    SUBNE R0, R0, V1
+    SAVE R0, [hurt]
+
+    MOV R0, [gstate]
+    CMP R0, V0
+    BNE fire_done
+    MOV R0, [firing]
+    CMP R0, V0
+    BEQ fire_done
+    MOV R0, [firecd]
+    CMP R0, V0
+    BNE fire_done
+
+    MOV R0, [ammo]
+    CMP R0, V0
+    BEQ fire_punch
+
+    SUB R0, R0, V1
+    SAVE R0, [ammo]
+    MOV R0, V7
+    SAVE R0, [firecd]
+    MOV R0, V3
+    SAVE R0, [flash]
+    FMOV R0, F99.0
+    SAVEM R0, [hsrange]
+    BL hitscan
+    B fire_done
+
+fire_punch:
+    MOV R0, V16
+    SAVE R0, [firecd]
+    FMOV R0, F1.7
+    SAVEM R0, [hsrange]
+    BL hitscan
+fire_done:
+    POP {PC}
+
+hitscan:
+    PUSH {LR}
+    MOV R0, =ZBUF_BASE
+    ADD R0, R0, V160
+    MOVM R1, [R0]
+    MOVM R2, [hsrange]
+    FCMP R2, R1
+    MOVLT R1, R2
+    SAVEM R1, [hswall]
+    FMOV R0, F99.0
+    SAVEM R0, [hsbest]
+    MOV R0, V0
+    SAVEM R0, [hstgt]
+    SAVE R0, [eidx]
+
+scan_loop:
+    MOV R0, [eidx]
+    LSL R0, V4
+    MOV R1, =ENT_BASE
+    ADD R0, R0, R1
+    MOV R1, [R0]
+    CMP R1, K_IMP
+    BNE scan_next
+
+    ADD R2, R0, V12
+    MOVM R3, [R2]
+    FCMP R3, F0.2
+    BLE scan_next
+    MOVM R4, [hswall]
+    FCMP R3, R4
+    BGE scan_next
+    MOVM R4, [hsbest]
+    FCMP R3, R4
+    BGE scan_next
+
+    ADD R2, R0, V14
+    MOVM R5, [R2]
+    MOV R6, =FP_SIGN
+    BIC R5, R5, R6
+    FCMP R5, F0.55
+    BGE scan_next
+
+    SAVEM R3, [hsbest]
+    SAVEM R0, [hstgt]
+scan_next:
+    MOV R0, [eidx]
+    ADD R0, R0, V1
+    SAVE R0, [eidx]
+    CMP R0, MAX_ENT
+    BLT scan_loop
+
+    MOVM R0, [hstgt]
+    CMP R0, V0
+    BEQ hitscan_done
+
+    ADD R1, R0, V1
+    MOV R2, [R1]
+    SUB R2, R2, V34
+    CMP R2, V0
+    BLE hitscan_kill
+    SAVE R2, [R1]
+    ADD R1, R0, V2
+    MOV R2, V1
+    SAVE R2, [R1]
+    B hitscan_done
+
+hitscan_kill:
+    MOV R2, K_DEAD
+    SAVE R2, [R0]
+    ADD R1, R0, V3
+    MOV R2, V0
+    SAVE R2, [R1]
+    MOV R2, [kills]
+    ADD R2, R2, V1
+    SAVE R2, [kills]
+    MOV R2, [nimp]
+    SUB R2, R2, V1
+    SAVE R2, [nimp]
+hitscan_done:
+    POP {PC}
+
+draw_weapon:
+    PUSH {LR}
+
+    MOV R0, [bobph]
+    LSR R0, V3
+    CMP R0, V3
+    MOVEQ R0, V1
+    MOV R1, [firecd]
+    CMP R1, V4
+    ADDGE R0, R0, V4
+    SAVE R0, [bob]
+
+    MOV R10, =GUN_BASE
+    MOV R0, V0
+gun_col:
+    MOV R1, V0
+gun_row:
+    MOV R2, [bob]
+    SUB R2, R1, R2
+    MAX R2, R2, V0
+    MUL R3, R0, GUN_H
+    ADD R3, R3, R2
+    ADD R3, R3, R10
+    MOV R4, [R3]
+    ADD R5, R0, GUN_X
+    ADD R6, R1, GUN_Y
+    CMP R4, V0
+    BNE gun_plot
+    CMP R6, BAND_Y
+    BLT gun_next
+    MOV R4, PANEL_BG
+gun_plot:
+    PIXELNB R5, R6, R4
+gun_next:
+    ADD R1, R1, V1
+    CMP R1, GUN_H
+    BLT gun_row
+    ADD R0, R0, V1
+    CMP R0, GUN_W
+    BLT gun_col
+
+    MOV R0, [flash]
+    CMP R0, V0
+    BEQ weapon_done
+    BL draw_flash
+weapon_done:
+    POP {PC}
+
+draw_flash:
+    MOV R0, V70
+flash_col:
+    MOV R1, V69
+flash_row:
+    SUB R2, R0, V80
+    MUL R2, R2, R2
+    SUB R3, R1, V79
+    MUL R3, R3, R3
+    ADD R2, R2, R3
+    CMP R2, V46
+    BGT flash_next
+    MOV R4, V240
+    CMP R2, V22
+    MOVLE R4, V252
+    CMP R2, V6
+    MOVLE R4, V255
+    PIXELNB R0, R1, R4
+flash_next:
+    ADD R1, R1, V1
+    CMP R1, V88
+    BLT flash_row
+    ADD R0, R0, V1
+    CMP R0, V91
+    BLT flash_col
+    MOV PC, R14
+
+draw_hud:
+    PUSH {LR}
+    BL hud_markers
+    BL hud_numbers
+    BL hud_lamps
+
+    MOV R0, [hurt]
+    CMP R0, V0
+    BEQ hud_no_hurt
+    BL draw_hurt
+hud_no_hurt:
+    MOV R0, [gstate]
+    CMP R0, V0
+    BEQ hud_done
+    BL draw_overlay
+hud_done:
+    POP {PC}
+
+hud_lamps:
+    MOV R1, [health]
+    DIV R1, R1, V10
+    MOV R2, V0
+    MOV R3, V0
+lamp_loop:
+    CMP R3, R1
+    BGE lamp_done
+    LSL R2, V1
+    ADD R2, R2, V1
+    ADD R3, R3, V1
+    B lamp_loop
+lamp_done:
+    MOV LE, R2
+
+    MOV R0, [health]
+    LSL R0, V8
+    MOV R1, [ammo]
+    ADD R0, R0, R1
+    MOV HEX, R0
+    MOV PC, R14
+
+hud_markers:
+    PUSH {LR}
+    MOV R0, V0
+    SAVE R0, [nnew]
+    SAVE R0, [eidx]
+mark_ent:
+    MOV R0, [eidx]
+    LSL R0, V4
+    MOV R1, =ENT_BASE
+    ADD R0, R0, R1
+    SAVEM R0, [ecur]
+    MOV R1, [R0]
+    CMP R1, V0
+    BEQ mark_ent_next
+    CMP R1, K_BALL
+    BEQ mark_ent_next
+
+    MOV R2, V224
+    CMP R1, K_MED
+    MOVEQ R2, V255
+    CMP R1, K_AMMO
+    MOVEQ R2, V28
+    CMP R1, K_DEAD
+    MOVEQ R2, V96
+    SAVE R2, [mkc]
+
+    ADD R3, R0, V4
+    MOVM R0, [R3]
+    MOVM R3, [ecur]
+    ADD R3, R3, V6
+    MOVM R1, [R3]
+    BL floor_pair
+    MOV R7, [mkc]
+    BL mark_add
+mark_ent_next:
+    MOV R0, [eidx]
+    ADD R0, R0, V1
+    SAVE R0, [eidx]
+    CMP R0, MAX_ENT
+    BLT mark_ent
+
+    MOV R0, [pang]
+    ADD R0, R0, V64
+    AND R0, R0, V255
+    BL sin_lookup
+    MOV R4, R1
+    MOV R0, [pang]
+    BL sin_lookup
+    MOV R5, R1
+    MOVM R0, [posx]
+    FADD R0, R0, R4
+    MOVM R1, [posy]
+    FADD R1, R1, R5
+    BL floor_pair
+    MOV R7, V252
+    BL mark_add
+
+    MOVM R0, [posx]
+    MOVM R1, [posy]
+    BL floor_pair
+    MOV R7, V255
+    BL mark_add
+
+    BL mark_flush
+    POP {PC}
+
+mark_add:
+    CMP R6, V31
+    BHI add_done
+    CMP R8, V31
+    BHI add_done
+    LSL R3, R8, V5
+    ADD R3, R3, R6
+
+    MOV R0, V0
+add_find:
+    MOV R1, [nnew]
+    CMP R0, R1
+    BGE add_append
+    MOV R2, =MARKN_BASE
+    ADD R2, R2, R0 LSL V1
+    MOVM R2, [R2]
+    CMP R2, R3
+    BEQ add_colour
+    ADD R0, R0, V1
+    B add_find
+
+add_append:
+    CMP R0, MAX_MARK
+    BGE add_done
+    MOV R2, =MARKN_BASE
+    ADD R2, R2, R0 LSL V1
+    SAVEM R3, [R2]
+    ADD R1, R0, V1
+    SAVE R1, [nnew]
+add_colour:
+    MOV R2, =MARKC_BASE
+    ADD R2, R2, R0
+    SAVE R7, [R2]
+add_done:
+    MOV PC, R14
+
+mark_flush:
+    MOV R0, V0
+flush_old:
+    MOV R1, [nmark]
+    CMP R0, R1
+    BGE flush_new
+    MOV R2, =MARK_BASE
+    ADD R2, R2, R0 LSL V1
+    MOVM R3, [R2]
+
+    MOV R4, V0
+flush_find:
+    MOV R5, [nnew]
+    CMP R4, R5
+    BGE flush_erase
+    MOV R5, =MARKN_BASE
+    ADD R5, R5, R4 LSL V1
+    MOVM R5, [R5]
+    CMP R5, R3
+    BEQ flush_keep
+    ADD R4, R4, V1
+    B flush_find
+
+flush_erase:
+    AND R4, R3, V31
+    LSR R5, R3, V5
+    MOV R6, =MAP_BASE
+    ADD R6, R6, R3
+    MOV R7, [R6]
+    MOV R8, V37
+    CMP R7, V1
+    MOVEQ R8, V164
+    CMP R7, V2
+    MOVEQ R8, V146
+    CMP R7, V3
+    MOVEQ R8, V173
+    CMP R7, V4
+    MOVEQ R8, V46
+    ADD R5, R5, BAND_Y
+    PIXELNB R4, R5, R8
+flush_keep:
+    ADD R0, R0, V1
+    B flush_old
+
+flush_new:
+    MOV R0, V0
+flush_draw:
+    MOV R1, [nnew]
+    CMP R0, R1
+    BGE flush_finish
+    MOV R2, =MARKN_BASE
+    ADD R2, R2, R0 LSL V1
+    MOVM R3, [R2]
+    MOV R2, =MARKC_BASE
+    ADD R2, R2, R0
+    MOV R4, [R2]
+    AND R5, R3, V31
+    LSR R6, R3, V5
+    ADD R6, R6, BAND_Y
+    PIXELNB R5, R6, R4
+    MOV R2, =MARK_BASE
+    ADD R2, R2, R0 LSL V1
+    SAVEM R3, [R2]
+    ADD R0, R0, V1
+    B flush_draw
+
+flush_finish:
+    MOV R0, [nnew]
+    SAVE R0, [nmark]
+    MOV PC, R14
+
+hud_numbers:
+    PUSH {LR}
+    MOV R0, [health]
+    MOV R1, [shown_hp]
+    CMP R0, R1
+    BEQ num_ammo
+    SAVE R0, [shown_hp]
+    BL draw_health
+num_ammo:
+    MOV R0, [ammo]
+    MOV R1, [shown_am]
+    CMP R0, R1
+    BEQ num_foes
+    SAVE R0, [shown_am]
+    MOV R1, __text_ref_label::t_am
+    BL put2
+    MOV R0, V130
+    MOV R1, V90
+    BL clear_num2
+    TEXT V130, V90, t_am, V252
+num_foes:
+    MOV R0, [nimp]
+    MOV R1, [shown_fo]
+    CMP R0, R1
+    BEQ num_level
+    SAVE R0, [shown_fo]
+    MOV R1, __text_ref_label::t_fo
+    BL put2
+    MOV R0, V130
+    MOV R1, V100
+    BL clear_num2
+    TEXT V130, V100, t_fo, V224
+num_level:
+    MOV R0, [level]
+    MOV R1, [shown_lv]
+    CMP R0, R1
+    BEQ num_done
+    SAVE R0, [shown_lv]
+    MOV R1, __text_ref_label::t_lv
+    BL put2
+    MOV R0, V130
+    MOV R1, V110
+    BL clear_num2
+    TEXT V130, V110, t_lv, V190
+num_done:
+    POP {PC}
+
+draw_health:
+    PUSH {LR}
+    MOV R0, [health]
+    MOV R1, __text_ref_label::t_hp
+    BL put3
+
+    MOV R0, V34
+health_clear_x:
+    MOV R1, V98
+health_clear_y:
+    PIXELNB R0, R1, PANEL_BG
+    ADD R1, R1, V1
+    CMP R1, V106
+    BLT health_clear_y
+    ADD R0, R0, V1
+    CMP R0, V54
+    BLT health_clear_x
+
+    MOV R2, V28
+    MOV R0, [health]
+    CMP R0, V60
+    MOVLE R2, V252
+    CMP R0, V30
+    MOVLE R2, V224
+    TEXT V35, V98, t_hp, R2
+
+    MOV R0, [health]
+    MUL R0, R0, V28
+    DIV R0, R0, V100
+    MOV R3, V0
+bar_col:
+    MOV R4, V110
+    MOV R5, V37
+    CMP R3, R0
+    MOVLT R5, R2
+    ADD R6, R3, V34
+bar_row:
+    PIXELNB R6, R4, R5
+    ADD R4, R4, V1
+    CMP R4, V115
+    BLT bar_row
+    ADD R3, R3, V1
+    CMP R3, V28
+    BLT bar_col
+    POP {PC}
+
+clear_num2:
+    ADD R2, R0, V12
+    ADD R3, R1, V8
+    MOV R4, R0
+clear_num_x:
+    MOV R5, R1
+clear_num_y:
+    PIXELNB R4, R5, PANEL_BG
+    ADD R5, R5, V1
+    CMP R5, R3
+    BLT clear_num_y
+    ADD R4, R4, V1
+    CMP R4, R2
+    BLT clear_num_x
+    MOV PC, R14
+
+put3:
+    DIV R2, R0, V100
+    MUL R3, R2, V100
+    SUB R0, R0, R3
+    DIV R3, R0, V10
+    MUL R4, R3, V10
+    SUB R4, R0, R4
+
+    MOV R5, V32
+    CMP R2, V0
+    ADDNE R5, R2, V48
+    SAVE R5, [R1]
+
+    MOV R5, V32
+    CMP R2, V0
+    ADDNE R5, R3, V48
+    CMP R3, V0
+    ADDNE R5, R3, V48
+    ADD R6, R1, V1
+    SAVE R5, [R6]
+
+    ADD R5, R4, V48
+    ADD R6, R1, V2
+    SAVE R5, [R6]
+    MOV PC, R14
+
+put2:
+    DIV R2, R0, V10
+    MUL R3, R2, V10
+    SUB R3, R0, R3
+    MOV R5, V32
+    CMP R2, V0
+    ADDNE R5, R2, V48
+    SAVE R5, [R1]
+    ADD R5, R3, V48
+    ADD R6, R1, V1
+    SAVE R5, [R6]
+    MOV PC, R14
+
+draw_hurt:
+    MOV R4, V224
+    MOV R0, V0
+hurt_top:
+    MOV R1, V0
+    PIXELNB R0, R1, R4
+    MOV R1, V1
+    PIXELNB R0, R1, R4
+    MOV R1, V86
+    PIXELNB R0, R1, R4
+    MOV R1, V87
+    PIXELNB R0, R1, R4
+    ADD R0, R0, V1
+    CMP R0, V160
+    BLT hurt_top
+
+    MOV R1, V0
+hurt_side:
+    MOV R2, V0
+    PIXELNB R2, R1, R4
+    MOV R2, V1
+    PIXELNB R2, R1, R4
+    MOV R2, V158
+    PIXELNB R2, R1, R4
+    MOV R2, V159
+    PIXELNB R2, R1, R4
+    ADD R1, R1, V1
+    CMP R1, BAND_Y
+    BLT hurt_side
+    MOV PC, R14
+
+draw_overlay:
+    PUSH {LR}
+    MOV R0, V28
+over_x:
+    MOV R1, V24
+over_y:
+    MOV R2, V1
+    CMP R0, V29
+    MOVLE R2, PANEL_ED
+    CMP R0, V129
+    MOVGE R2, PANEL_ED
+    CMP R1, V25
+    MOVLE R2, PANEL_ED
+    CMP R1, V62
+    MOVGE R2, PANEL_ED
+    PIXELNB R0, R1, R2
+    ADD R1, R1, V1
+    CMP R1, V64
+    BLT over_y
+    ADD R0, R0, V1
+    CMP R0, V132
+    BLT over_x
+
+    MOV R2, [gstate]
+    CMP R2, V2
+    BEQ over_win
+    TEXT V56, V32, "YOU DIED", V224
+    B over_prompt
+over_win:
+    TEXT V47, V32, "LEVEL CLEAR", V60
+over_prompt:
+    TEXT V41, V48, "PRESS ANY KEY", V218
+    POP {PC}
+
+hud_init:
+    PUSH {LR}
+
+    MOV R1, V0
+map_row:
+    MOV R0, V0
+map_col:
+    LSL R6, R1, V5
+    ADD R6, R6, R0
+    MOV R7, =MAP_BASE
+    ADD R6, R6, R7
+    MOV R7, [R6]
+    MOV R8, V37
+    CMP R7, V1
+    MOVEQ R8, V164
+    CMP R7, V2
+    MOVEQ R8, V146
+    CMP R7, V3
+    MOVEQ R8, V173
+    CMP R7, V4
+    MOVEQ R8, V46
+    ADD R9, R1, BAND_Y
+    PIXELNB R0, R9, R8
+    ADD R0, R0, V1
+    CMP R0, V32
+    BLT map_col
+    ADD R1, R1, V1
+    CMP R1, V32
+    BLT map_row
+
+    MOV R0, V32
+panel_x:
+    MOV R1, BAND_Y
+panel_y:
+    MOV R2, PANEL_BG
+    CMP R1, BAND_Y
+    MOVEQ R2, PANEL_ED
+    CMP R0, V32
+    MOVEQ R2, PANEL_ED
+    CMP R0, V96
+    MOVEQ R2, PANEL_ED
+    CMP R0, V159
+    MOVEQ R2, PANEL_ED
+    PIXELNB R0, R1, R2
+    ADD R1, R1, V1
+    CMP R1, V120
+    BLT panel_y
+    ADD R0, R0, V1
+    CMP R0, V64
+    BLT panel_next
+    CMP R0, V96
+    BLT panel_skip
+panel_next:
+    CMP R0, V160
+    BLT panel_x
+    B panel_labels
+panel_skip:
+    MOV R0, V96
+    B panel_x
+
+panel_labels:
+    TEXT V36, V90, "HP", V182
+    TEXT V100, V90, "AMMO", V182
+    TEXT V100, V100, "FOES", V182
+    TEXT V100, V110, "LV", V182
+
+    MOV R0, V255
+    SAVE R0, [shown_hp]
+    SAVE R0, [shown_am]
+    SAVE R0, [shown_fo]
+    SAVE R0, [shown_lv]
+    POP {PC}
+
+gen_sin:
+    MOV R10, =SIN_BASE
+    MOV R9, =FP_SIGN
+    MOV R0, V0
+gen_sin_loop:
+    ADD R1, R0, R11
+    FSUB R1, R1, F1536.0
+    FMUL R1, R1, F0.024543693
+    FMUL R2, R1, R1
+
+    FMOV R3, F-0.000198413
+    FMUL R3, R3, R2
+    FADD R3, R3, F0.008333333
+    FMUL R3, R3, R2
+    FADD R3, R3, F-0.166666667
+    FMUL R3, R3, R2
+    FADD R3, R3, F1.0
+    FMUL R3, R3, R1
+
+    EOR R5, R3, R9
+
+    ADD R6, R10, R0 LSL V1
+    SAVEM R3, [R6]
+    MOV R7, V128
+    SUB R7, R7, R0
+    ADD R6, R10, R7 LSL V1
+    SAVEM R3, [R6]
+    ADD R7, R0, V128
+    ADD R6, R10, R7 LSL V1
+    SAVEM R5, [R6]
+    MOV R7, V256
+    SUB R7, R7, R0
+    AND R7, R7, V255
+    ADD R6, R10, R7 LSL V1
+    SAVEM R5, [R6]
+
+    ADD R0, R0, V1
+    CMP R0, V65
+    BLT gen_sin_loop
+    MOV PC, R14
+
+gen_tex:
+    MOV R10, =LCG_MUL
+    MOV R12, =LCG_ADD
+    MOV R8, V777
+    MOV R7, =TEX_BASE
+
+    MOV R0, V0
+tex0_x:
+    MOV R1, V0
+tex0_y:
+    MUL R8, R8, R10
+    ADD R8, R8, R12
+    MOV R2, V219
+    AND R3, R1, V7
+    CMP R3, V0
+    BEQ tex0_store
+    LSR R3, R1, V3
+    AND R3, R3, V1
+    LSL R3, V3
+    ADD R4, R0, R3
+    AND R4, R4, V15
+    CMP R4, V0
+    BEQ tex0_store
+    LSR R4, R1, V3
+    ADD R5, R0, R3
+    LSR R5, R5, V4
+    MUL R4, R4, V5
+    MADD R4, R5, V3
+    AND R4, R4, V3
+    MOV R2, V164
+    CMP R4, V0
+    MOVEQ R2, V132
+    CMP R4, V1
+    MOVEQ R2, V196
+tex0_store:
+    LSL R6, R0, V5
+    ADD R6, R6, R1
+    ADD R6, R6, R7
+    SAVE R2, [R6]
+    ADD R1, R1, V1
+    CMP R1, V32
+    BLT tex0_y
+    ADD R0, R0, V1
+    CMP R0, V32
+    BLT tex0_x
+
+    ADD R7, R7, TEX_SIZE
+    MOV R0, V0
+tex1_x:
+    MOV R1, V0
+tex1_y:
+    AND R3, R0, V15
+    AND R4, R1, V15
+    MOV R2, V73
+    CMP R3, V0
+    BEQ tex1_store
+    CMP R4, V0
+    BEQ tex1_store
+    MOV R2, V182
+    CMP R3, V1
+    BEQ tex1_store
+    CMP R4, V1
+    BEQ tex1_store
+    LSR R5, R0, V4
+    LSR R9, R1, V4
+    MUL R5, R5, V7
+    MADD R5, R9, V3
+    AND R5, R5, V3
+    MOV R2, V146
+    CMP R5, V0
+    MOVEQ R2, V109
+tex1_store:
+    LSL R6, R0, V5
+    ADD R6, R6, R1
+    ADD R6, R6, R7
+    SAVE R2, [R6]
+    ADD R1, R1, V1
+    CMP R1, V32
+    BLT tex1_y
+    ADD R0, R0, V1
+    CMP R0, V32
+    BLT tex1_x
+
+    ADD R7, R7, TEX_SIZE
+    MOV R0, V0
+tex2_x:
+    MOV R1, V0
+tex2_y:
+    MOV R2, V65
+    AND R3, R0, V7
+    CMP R3, V0
+    BEQ tex2_store
+    MOV R2, V173
+    MUL R5, R0, V11
+    AND R5, R5, V7
+    CMP R5, V2
+    MOVLT R2, V141
+tex2_store:
+    LSL R6, R0, V5
+    ADD R6, R6, R1
+    ADD R6, R6, R7
+    SAVE R2, [R6]
+    ADD R1, R1, V1
+    CMP R1, V32
+    BLT tex2_y
+    ADD R0, R0, V1
+    CMP R0, V32
+    BLT tex2_x
+
+    ADD R7, R7, TEX_SIZE
+    MOV R0, V0
+tex3_x:
+    MOV R1, V0
+tex3_y:
+    AND R3, R0, V15
+    AND R4, R1, V15
+    MOV R2, V5
+    CMP R3, V0
+    BEQ tex3_store
+    CMP R4, V0
+    BEQ tex3_store
+    SUB R5, R3, V8
+    MUL R5, R5, R5
+    SUB R9, R4, V8
+    MUL R9, R9, R9
+    MOV R2, V46
+    ADD R5, R5, R9
+    CMP R5, V9
+    MOVLE R2, V118
+    CMP R5, V5
+    MOVLE R2, V191
+tex3_store:
+    LSL R6, R0, V5
+    ADD R6, R6, R1
+    ADD R6, R6, R7
+    SAVE R2, [R6]
+    ADD R1, R1, V1
+    CMP R1, V32
+    BLT tex3_y
+    ADD R0, R0, V1
+    CMP R0, V32
+    BLT tex3_x
+    MOV PC, R14
+
+gen_spr:
+    PUSH {LR}
+    BL gen_imp
+    BL gen_corpse
+    BL gen_pickups
+    BL gen_ball
+    POP {PC}
+
+gen_imp:
+    MOV R12, V0
+imp_variant:
+    MOV R10, =SPR_BASE
+    CMP R12, V0
+    ADDNE R10, R10, SPR_SIZE
+    MOV R0, V0
+imp_x:
+    MOV R1, V0
+imp_y:
+    MOV R2, V0
+
+    MOV R8, V3
+    CMP R12, V0
+    MOVNE R8, V2
+    CMP R1, V24
+    BLT imp_arms
+    SUB R5, R0, V16
+    ABS R5, R5
+    SUB R9, R5, R8
+    ABS R9, R9
+    CMP R9, V2
+    BGT imp_arms
+    MOV R2, V164
+    CMP R1, V30
+    MOVGE R2, V218
+
+imp_arms:
+    MOV R6, V14
+    MOV R7, V22
+    MOV R8, V8
+    CMP R12, V0
+    MOVNE R6, V9
+    MOVNE R7, V17
+    MOVNE R8, V9
+    CMP R1, R6
+    BLT imp_torso
+    CMP R1, R7
+    BGT imp_torso
+    SUB R5, R0, V16
+    ABS R5, R5
+    SUB R9, R5, R8
+    ABS R9, R9
+    CMP R9, V2
+    BGT imp_torso
+    MOV R2, V164
+    SUB R9, R7, V1
+    CMP R1, R9
+    MOVGE R2, V218
+
+imp_torso:
+    CMP R1, V13
+    BLT imp_head
+    CMP R1, V23
+    BGT imp_head
+    SUB R5, R0, V16
+    ABS R5, R5
+    MOV R9, V5
+    CMP R1, V15
+    MOVLE R9, V7
+    CMP R5, R9
+    BGT imp_head
+    MOV R2, V164
+    SUB R5, R0, V16
+    CMP R5, V-3
+    MOVLE R2, V233
+    CMP R5, V3
+    MOVGE R2, V96
+
+imp_head:
+    SUB R5, R0, V16
+    MUL R6, R5, R5
+    SUB R7, R1, V8
+    MUL R7, R7, R7
+    ADD R6, R6, R7
+    CMP R6, V40
+    BGT imp_face
+    MOV R2, V164
+    CMP R5, V-3
+    MOVLE R2, V233
+    CMP R5, V3
+    MOVGE R2, V96
+
+imp_face:
+    CMP R1, V5
+    BGT imp_eyes
+    SUB R5, R0, V16
+    ABS R5, R5
+    CMP R5, V5
+    BLT imp_eyes
+    CMP R5, V6
+    BGT imp_eyes
+    MOV R2, V218
+
+imp_eyes:
+    CMP R1, V6
+    BLT imp_mouth
+    CMP R1, V7
+    BGT imp_mouth
+    SUB R5, R0, V16
+    ABS R5, R5
+    CMP R5, V2
+    BLT imp_mouth
+    CMP R5, V4
+    BGT imp_mouth
+    MOV R2, V252
+
+imp_mouth:
+    CMP R1, V10
+    BLT imp_store
+    CMP R1, V12
+    BGT imp_store
+    SUB R5, R0, V16
+    ABS R5, R5
+    CMP R5, V4
+    BGT imp_store
+    MOV R2, V32
+    CMP R1, V12
+    BNE imp_store
+    AND R9, R0, V1
+    CMP R9, V0
+    MOVEQ R2, V218
+
+imp_store:
+    LSL R5, R0, V5
+    ADD R5, R5, R1
+    ADD R5, R5, R10
+    SAVE R2, [R5]
+    ADD R1, R1, V1
+    CMP R1, V32
+    BLT imp_y
+    ADD R0, R0, V1
+    CMP R0, V32
+    BLT imp_x
+    ADD R12, R12, V1
+    CMP R12, V2
+    BLT imp_variant
+    MOV PC, R14
+
+gen_corpse:
+    MOV R10, =SPR_BASE + 2 * SPR_SIZE
+    MOV R0, V0
+dead_x:
+    MOV R1, V0
+dead_y:
+    MOV R2, V0
+    CMP R1, V23
+    BLT dead_store
+    SUB R5, R1, V23
+    ADD R6, R5, V3
+    SUB R7, R0, V16
+    ABS R7, R7
+    CMP R7, R6
+    BGT dead_store
+    MOV R2, V96
+    CMP R7, V4
+    MOVLE R2, V164
+    ADD R8, R0, R1
+    AND R8, R8, V7
+    CMP R8, V0
+    MOVEQ R2, V218
+dead_store:
+    LSL R5, R0, V5
+    ADD R5, R5, R1
+    ADD R5, R5, R10
+    SAVE R2, [R5]
+    ADD R1, R1, V1
+    CMP R1, V32
+    BLT dead_y
+    ADD R0, R0, V1
+    CMP R0, V32
+    BLT dead_x
+    MOV PC, R14
+
+gen_pickups:
+    MOV R10, =SPR_BASE + 3 * SPR_SIZE
+    MOV R0, V0
+med_x:
+    MOV R1, V0
+med_y:
+    MOV R2, V0
+    CMP R1, V12
+    BLT med_store
+    CMP R1, V27
+    BGT med_store
+    SUB R5, R0, V16
+    ABS R5, R5
+    CMP R5, V7
+    BGT med_store
+    MOV R2, V255
+    CMP R5, V7
+    MOVEQ R2, V146
+    CMP R1, V12
+    MOVEQ R2, V146
+    CMP R1, V27
+    MOVEQ R2, V146
+    CMP R2, V146
+    BEQ med_store
+    CMP R5, V1
+    BGT med_bar
+    CMP R1, V16
+    BLT med_store
+    CMP R1, V23
+    BGT med_store
+    MOV R2, V224
+    B med_store
+med_bar:
+    CMP R5, V4
+    BGT med_store
+    CMP R1, V18
+    BLT med_store
+    CMP R1, V21
+    BGT med_store
+    MOV R2, V224
+med_store:
+    LSL R5, R0, V5
+    ADD R5, R5, R1
+    ADD R5, R5, R10
+    SAVE R2, [R5]
+    ADD R1, R1, V1
+    CMP R1, V32
+    BLT med_y
+    ADD R0, R0, V1
+    CMP R0, V32
+    BLT med_x
+
+    MOV R10, =SPR_BASE + 4 * SPR_SIZE
+    MOV R0, V0
+ammo_x:
+    MOV R1, V0
+ammo_y:
+    MOV R2, V0
+    SUB R5, R0, V16
+    ABS R5, R5
+    CMP R1, V12
+    BLT ammo_store
+    CMP R1, V15
+    BGT ammo_body
+    CMP R5, V5
+    BGT ammo_store
+    AND R6, R0, V1
+    CMP R6, V0
+    BNE ammo_store
+    MOV R2, V252
+    CMP R1, V12
+    MOVEQ R2, V240
+    B ammo_store
+ammo_body:
+    CMP R1, V27
+    BGT ammo_store
+    CMP R5, V6
+    BGT ammo_store
+    MOV R2, V76
+    CMP R5, V6
+    MOVEQ R2, V36
+    CMP R1, V27
+    MOVEQ R2, V36
+    CMP R1, V16
+    MOVEQ R2, V36
+    ADD R6, R1, V3
+    AND R6, R6, V7
+    CMP R6, V0
+    MOVEQ R2, V36
+ammo_store:
+    LSL R5, R0, V5
+    ADD R5, R5, R1
+    ADD R5, R5, R10
+    SAVE R2, [R5]
+    ADD R1, R1, V1
+    CMP R1, V32
+    BLT ammo_y
+    ADD R0, R0, V1
+    CMP R0, V32
+    BLT ammo_x
+    MOV PC, R14
+
+gen_ball:
+    MOV R10, =SPR_BASE + 5 * SPR_SIZE
+    MOV R0, V0
+ball_x:
+    MOV R1, V0
+ball_y:
+    SUB R5, R0, V16
+    MUL R5, R5, R5
+    SUB R6, R1, V16
+    MUL R6, R6, R6
+    ADD R5, R5, R6
+    MOV R2, V0
+    CMP R5, V81
+    BGT ball_store
+    MOV R2, V224
+    CMP R5, V49
+    MOVLE R2, V240
+    CMP R5, V25
+    MOVLE R2, V252
+    CMP R5, V9
+    MOVLE R2, V255
+ball_store:
+    LSL R5, R0, V5
+    ADD R5, R5, R1
+    ADD R5, R5, R10
+    SAVE R2, [R5]
+    ADD R1, R1, V1
+    CMP R1, V32
+    BLT ball_y
+    ADD R0, R0, V1
+    CMP R0, V32
+    BLT ball_x
+    MOV PC, R14
+
+gen_gun:
+    MOV R10, =GUN_BASE
+    MOV R0, V0
+gun_gen_x:
+    MOV R1, V0
+gun_gen_y:
+    MOV R2, V0
+    SUB R4, R0, V16
+    ABS R4, R4
+
+    CMP R1, V25
+    BLT gun_gen_body
+    SUB R5, R0, V9
+    ABS R5, R5
+    SUB R6, R0, V23
+    ABS R6, R6
+    MIN R5, R5, R6
+    CMP R5, V6
+    BGT gun_gen_body
+    MOV R2, V104
+    CMP R5, V6
+    MOVEQ R2, V68
+    SUB R7, R1, V25
+    AND R7, R7, V7
+    CMP R7, V0
+    MOVEQ R2, V68
+    CMP R7, V5
+    MOVEQ R2, V141
+
+gun_gen_body:
+    CMP R1, V13
+    BLT gun_gen_barrel
+    CMP R1, V30
+    BGT gun_gen_barrel
+    SUB R6, R1, V13
+    ADD R6, R6, V7
+    MIN R6, R6, V12
+    CMP R4, R6
+    BGT gun_gen_barrel
+    MOV R2, V146
+    SUB R7, R6, V1
+    CMP R4, R7
+    MOVGE R2, V73
+    CMP R4, V3
+    MOVLE R2, V182
+
+gun_gen_barrel:
+    CMP R1, V17
+    BGT gun_gen_store
+    CMP R4, V5
+    BGT gun_gen_store
+    MOV R2, V73
+    CMP R4, V4
+    MOVLE R2, V146
+    CMP R4, V1
+    MOVLE R2, V182
+    CMP R1, V1
+    MOVLE R2, V182
+    CMP R1, V2
+    BGT gun_gen_store
+    CMP R4, V3
+    MOVLE R2, V36
+
+gun_gen_store:
+    MUL R5, R0, GUN_H
+    ADD R5, R5, R1
+    ADD R5, R5, R10
+    SAVE R2, [R5]
+    ADD R1, R1, V1
+    CMP R1, GUN_H
+    BLT gun_gen_y
+    ADD R0, R0, V1
+    CMP R0, GUN_W
+    BLT gun_gen_x
+    MOV PC, R14
+
+gen_sky:
+    MOV R7, =SKY_BASE
+    MOV R0, V0
+sky_loop:
+    CMP R0, HORIZON
+    BGE sky_floor
+    LSR R1, R0, V4
+    LSL R4, R1, V2
+    ADD R4, R4, V1
+    CMP R1, V2
+    ADDGE R4, R4, V1
+    B sky_store
+sky_floor:
+    SUB R1, R0, HORIZON
+    LSR R1, R1, V4
+    ADD R2, R1, V2
+    LSL R4, R2, V5
+    ADD R4, R4, R2 LSL V2
+    LSR R3, R2, V1
+    ADD R4, R4, R3
+sky_store:
+    ADD R5, R7, R0
+    SAVE R4, [R5]
+    ADD R0, R0, V1
+    CMP R0, VIEW_H
+    BLT sky_loop
+    MOV PC, R14
+
+gen_map:
+    MOV R10, =LCG_MUL
+    MOV R12, =LCG_ADD
+    MOVM R8, [seed]
+
+    MOV R7, =MAP_BASE
+    MOV R0, V0
+    MOV R2, V1
+map_fill:
+    ADD R6, R7, R0
+    SAVE R2, [R6]
+    ADD R0, R0, V1
+    CMP R0, V1024
+    BLT map_fill
+
+    MOV R1, V1
+maze_y:
+    MOV R0, V1
+maze_x:
+    MUL R8, R8, R10
+    ADD R8, R8, R12
+    LSL R6, R1, V5
+    ADD R6, R6, R0
+    ADD R6, R6, R7
+    MOV R2, V0
+    SAVE R2, [R6]
+
+    MOV R3, V0
+    CMP R1, V1
+    MOVGT R3, V1
+    MOV R4, V0
+    CMP R0, V29
+    MOVLT R4, V1
+    LSR R5, R8, V9
+    AND R5, R5, V1
+
+    CMP R3, V0
+    BEQ maze_try_east
+    CMP R4, V0
+    BEQ maze_do_north
+    CMP R5, V0
+    BEQ maze_do_north
+    B maze_do_east
+maze_do_north:
+    SUB R9, R1, V1
+    LSL R6, R9, V5
+    ADD R6, R6, R0
+    ADD R6, R6, R7
+    MOV R2, V0
+    SAVE R2, [R6]
+    B maze_next
+maze_try_east:
+    CMP R4, V0
+    BEQ maze_next
+maze_do_east:
+    LSL R6, R1, V5
+    ADD R6, R6, R0
+    ADD R6, R6, V1
+    ADD R6, R6, R7
+    MOV R2, V0
+    SAVE R2, [R6]
+maze_next:
+    ADD R0, R0, V2
+    CMP R0, V30
+    BLT maze_x
+    ADD R1, R1, V2
+    CMP R1, V30
+    BLT maze_y
+
+    MOV R5, V0
+room_loop:
+    MUL R8, R8, R10
+    ADD R8, R8, R12
+    LSR R0, R8, V8
+    AND R0, R0, V15
+    ADD R0, R0, V4
+    MUL R8, R8, R10
+    ADD R8, R8, R12
+    LSR R1, R8, V8
+    AND R1, R1, V15
+    ADD R1, R1, V4
+    MOV R2, V0
+room_y:
+    MOV R3, V0
+room_x:
+    ADD R9, R1, R2
+    LSL R6, R9, V5
+    ADD R9, R0, R3
+    ADD R6, R6, R9
+    ADD R6, R6, R7
+    MOV R4, V0
+    SAVE R4, [R6]
+    ADD R3, R3, V1
+    CMP R3, V5
+    BLT room_x
+    ADD R2, R2, V1
+    CMP R2, V5
+    BLT room_y
+    ADD R5, R5, V1
+    CMP R5, V10
+    BLT room_loop
+
+    SAVEM R8, [seed]
+
+    MOV R1, V0
+assign_y:
+    MOV R0, V0
+assign_x:
+    LSL R6, R1, V5
+    ADD R6, R6, R0
+    ADD R6, R6, R7
+    MOV R2, [R6]
+    MOV R3, V0
+    CMP R0, V0
+    MOVEQ R3, V1
+    CMP R0, V31
+    MOVEQ R3, V1
+    CMP R1, V0
+    MOVEQ R3, V1
+    CMP R1, V31
+    MOVEQ R3, V1
+    CMP R3, V1
+    MOVEQ R2, V1
+    CMP R2, V0
+    BEQ assign_next
+    LSR R4, R0, V3
+    LSR R5, R1, V3
+    ADD R4, R4, R5
+    AND R4, R4, V3
+    ADD R4, R4, V1
+    SAVE R4, [R6]
+assign_next:
+    ADD R0, R0, V1
+    CMP R0, V32
+    BLT assign_x
+    ADD R1, R1, V1
+    CMP R1, V32
+    BLT assign_y
+
+    MOV R1, V1
+spawn_pocket_y:
+    MOV R0, V1
+spawn_pocket_x:
+    LSL R6, R1, V5
+    ADD R6, R6, R0
+    ADD R6, R6, R7
+    MOV R2, V0
+    SAVE R2, [R6]
+    ADD R0, R0, V1
+    CMP R0, V3
+    BLT spawn_pocket_x
+    ADD R1, R1, V1
+    CMP R1, V3
+    BLT spawn_pocket_y
+    MOV PC, R14

@@ -1,0 +1,155 @@
+const SEED       = 0x27EF  # xorshift seed; fixed so tests reproduce
+const NOISE_MASK = 0x0F  # 1-in-16 pixel flip probability
+const DIGITS     = 10
+const PIXELS     = 64
+const ROWS       = 5
+
+const CELL_W     = 80
+const CELL_H     = 24
+const ORIGIN_X   = 8
+const ORIGIN_Y   = 4
+const RESULT_DX  = 24
+
+const WHITE      = 0xFF  # RGB332
+const GREEN      = 0x1C
+const RED        = 0xE0
+
+include "data/digits8x8_weights.de1"
+    bias:    40
+    sample:  64
+    logits:  10
+
+main:
+    MOV R11, =SEED
+    MOV R12, V0
+digit_loop:
+    BL make_sample
+    BL classify
+    BL draw_cell
+    ADD R12, R12, V1
+    CMP R12, V(DIGITS)
+    BNE digit_loop
+    B done
+
+next_rand:
+    LSL R0, R11, V7
+    EOR R11, R11, R0
+    LSR R0, R11, V9
+    EOR R11, R11, R0
+    LSL R0, R11, V8
+    EOR R11, R11, R0
+    MOV PC, LR
+
+make_sample:
+    PUSH {R1, R2, R3, R4, LR}
+    MOV R1, =stencils
+    MUL R2, R12, V(PIXELS)
+    ADD R1, R1, R2
+    MOV R2, =sample
+    MOV R3, V0
+sample_pixel:
+    MOV R4, [R1]
+    BL next_rand
+    AND R0, R11, V(NOISE_MASK)
+    CMP R0, V0
+    RSBEQ R4, R4, V0
+    SAVE R4, [R2]
+    ADD R1, R1, V1
+    ADD R2, R2, V1
+    ADD R3, R3, V1
+    CMP R3, V(PIXELS)
+    BNE sample_pixel
+    POP {R1, R2, R3, R4, PC}
+
+classify:
+    PUSH {R0, R1, LR}
+    NPUCFG MODE, V(NPU_CONV)
+    NPUCFG FLAGS, V0
+    MOV R0, =sample
+    NPUCFG IN_BASE, R0
+    NPUCFG IN_W, V1
+    NPUCFG IN_H, V1
+    NPUCFG IN_C, V(PIXELS)
+    MOV R0, =stencils
+    NPUCFG W_BASE, R0
+    MOV R0, =bias
+    NPUCFG B_BASE, R0
+    MOV R0, =logits
+    NPUCFG OUT_BASE, R0
+    NPUCFG OUT_W, V1
+    NPUCFG OUT_H, V1
+    NPUCFG OUT_C, V(DIGITS)
+    NPUCFG K_W, V1
+    NPUCFG K_H, V1
+    NPUCFG STRIDE, V(0x0101)
+    NPUCFG PAD, V0
+    NPUCFG IN_ZP, V0
+    NPUCFG OUT_ZP, V0
+    NPUCFG MULT, V0
+    NPUCFG SHIFT, V0
+    NPUCFG ACT_MIN, V0
+    NPUCFG ACT_MAX, V0
+    NPURUN R1
+
+    NPUCFG MODE, V(NPU_ARGMAX)
+    MOV R0, =logits
+    NPUCFG IN_BASE, R0
+    NPUCFG OUT_C, V(DIGITS)
+    NPURUN R10
+    POP {R0, R1, PC}
+
+draw_cell:
+    PUSH {R1, R2, R3, R4, R5, R6, LR}
+    DIV R1, R12, V(ROWS)
+    MUL R2, R1, V(ROWS)
+    SUB R2, R12, R2
+    MUL R3, R1, V(CELL_W)
+    ADD R3, R3, V(ORIGIN_X)
+    MUL R4, R2, V(CELL_H)
+    ADD R4, R4, V(ORIGIN_Y)
+
+    MOV R5, =sample
+    MOV R6, V(WHITE)
+    BL draw8
+
+    MOV R5, =stencils
+    MUL R0, R10, V(PIXELS)
+    ADD R5, R5, R0
+    ADD R3, R3, V(RESULT_DX)
+    MOV R6, V(GREEN)
+    CMP R10, R12
+    MOVNE R6, V(RED)
+    BL draw8
+    POP {R1, R2, R3, R4, R5, R6, PC}
+
+draw8:
+    PUSH {R0, R1, R2, R5, R7, R8, LR}
+    MOV R7, V0
+draw_row:
+    MOV R8, V0
+draw_col:
+    MOV R0, [R5]
+    CMP R0, V1
+    BNE draw_next
+    LSL R1, R8, V1
+    ADD R1, R1, R3
+    LSL R2, R7, V1
+    ADD R2, R2, R4
+    PIXELNB R1, R2, R6
+    ADD R1, R1, V1
+    PIXELNB R1, R2, R6
+    ADD R2, R2, V1
+    PIXELNB R1, R2, R6
+    SUB R1, R1, V1
+    PIXELNB R1, R2, R6
+draw_next:
+    ADD R5, R5, V1
+    ADD R8, R8, V1
+    CMP R8, V8
+    BNE draw_col
+    ADD R7, R7, V1
+    CMP R7, V8
+    BNE draw_row
+    POP {R0, R1, R2, R5, R7, R8, PC}
+
+done:

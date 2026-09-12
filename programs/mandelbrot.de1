@@ -1,0 +1,336 @@
+const CYCLES_HI = 0xFF10  # MMIO cycle counter, high half
+
+const SCREEN_W = 160
+const HALF_H = 60
+const MIRROR_Y = 119
+const INTERIOR = 1
+
+const PAL_ANCHORS = 16
+const PAL_SPAN = 8
+const PAL_SIZE = PAL_ANCHORS * PAL_SPAN
+const PAL_MASK = PAL_SIZE - 1
+
+space:
+    keys        = 00000000
+
+    step        = F0.01875  # complex-plane units per pixel
+    center_real = F-0.75
+    iter_limit  = 01000000
+    row_f       = F-59.5
+    frame_tick  = 0000000000000000
+
+    anchor_r = {{5, 19, 12, 40, 80, 130, 158, 252, 255, 255, 252, 232, 196, 136, 98, 22, 5}}
+    anchor_g = {{30, 40, 80, 123, 158, 196, 210, 254, 218, 190, 170, 117, 82, 48, 30, 26, 30}}
+    anchor_b = {{86, 120, 176, 214, 236, 248, 250, 255, 140, 92, 52, 26, 20, 25, 52, 74, 86}}
+
+    palette: PAL_SIZE
+
+main:
+    BL gen_palette
+
+    FMOV R0, F0.01875
+    SAVEM R0, [step]
+    FMOV R0, F-0.75
+    SAVEM R0, [center_real]
+    MOV LE, V0
+    MOV HEX, V0
+
+frame_loop:
+    BL mark_frame
+    BL read_input
+    BL render
+    BL show_status
+    B frame_loop
+
+read_input:
+    PUSH {R4-R7, LR}
+
+    WAITKNB R4, V15
+    SAVE R4, [keys]
+    MOV LE, R4
+
+    AND R5, R4, V9
+    CMP R5, V9
+    BEQ pan_recenter
+    CMP R5, V1
+    BEQ pan_left
+    CMP R5, V8
+    BEQ pan_right
+    B zoom_select
+
+pan_left:
+    MOVM R6, [step]
+    FMUL R6, R6, F8.0
+    MOVM R7, [center_real]
+    FSUB R7, R7, R6
+    FCMP R7, F-2.0
+    BGE pan_store
+    FMOV R7, F-2.0
+    B pan_store
+
+pan_right:
+    MOVM R6, [step]
+    FMUL R6, R6, F8.0
+    MOVM R7, [center_real]
+    FADD R7, R7, R6
+    FCMP R7, F0.75
+    BLE pan_store
+    FMOV R7, F0.75
+    B pan_store
+
+pan_recenter:
+    FMOV R7, F-0.75
+
+pan_store:
+    SAVEM R7, [center_real]
+
+zoom_select:
+    AND R5, R4, V6
+    CMP R5, V6
+    BEQ view_reset
+    CMP R5, V2
+    BEQ zoom_in
+    CMP R5, V4
+    BEQ zoom_out
+    B input_done
+
+zoom_in:
+    MOVM R7, [step]
+    FMUL R6, R7, F0.8
+    BL zoom_floor
+    FCMP R6, R5
+    BGE zoom_store
+    MOV R6, R5
+    FCMP R6, R7
+    BLE zoom_store
+    MOV R6, R7
+    B zoom_store
+
+zoom_out:
+    MOVM R6, [step]
+    FMUL R6, R6, F1.25
+    FCMP R6, F0.01875
+    BLE zoom_store
+    FMOV R6, F0.01875
+    B zoom_store
+
+view_reset:
+    FMOV R6, F0.01875
+    FMOV R7, F-0.75
+    SAVEM R7, [center_real]
+
+zoom_store:
+    SAVEM R6, [step]
+
+input_done:
+    BL sync_iter_limit
+    POP {R4-R7, PC}
+
+zoom_floor:
+    MOVM R5, [center_real]
+    LSL R5, R5, V1
+    LSR R5, R5, V1
+    FMUL R5, R5, F0.0013
+    FCMP R5, F0.0002
+    BGE zoom_floor_done
+    FMOV R5, F0.0002
+zoom_floor_done:
+    MOV PC, R14
+
+sync_iter_limit:
+    MOVM R6, [step]
+    MOV R5, V64
+    FCMP R6, F0.01
+    BGE iter_store
+    MOV R5, V96
+    FCMP R6, F0.005
+    BGE iter_store
+    MOV R5, V128
+    FCMP R6, F0.0025
+    BGE iter_store
+    MOV R5, V160
+    FCMP R6, F0.0012
+    BGE iter_store
+    MOV R5, V224
+iter_store:
+    SAVE R5, [iter_limit]
+    MOV PC, R14
+
+render:
+    PUSH {LR}
+
+    FMOV R1, F4.0
+    MOVM R12, [step]
+    MOVM R0, [center_real]
+
+    FMOV R2, F-59.5
+    SAVEM R2, [row_f]
+    MOV R9, V0
+
+mandelbrot_row:
+    MOVM R2, [row_f]
+    FMUL R11, R2, R12
+    FADD R2, R2, F1.0
+    SAVEM R2, [row_f]
+
+    FMOV R14, F-79.5
+    MOV R8, V0
+
+mandelbrot_pixel:
+    FMUL R10, R14, R12
+    FADD R10, R10, R0
+
+    FADD R2, R10, F1.0
+    FMUL R2, R2, R2
+    FMUL R3, R11, R11
+    FADD R2, R2, R3
+    FCMP R2, F0.0625
+    BLE mandelbrot_inside
+
+    FSUB R2, R10, F0.25
+    FMUL R3, R2, R2
+    FMUL R4, R11, R11
+    FADD R3, R3, R4
+    FADD R5, R3, R2
+    FMUL R5, R3, R5
+    FMUL R4, R4, F0.25
+    FCMP R5, R4
+    BLE mandelbrot_inside
+
+    MOV R2, R10
+    MOV R3, R11
+    MOV R7, [iter_limit]
+
+mandelbrot_iter:
+    FMUL R4, R2, R2
+    FMUL R5, R3, R3
+    FADD R6, R4, R5
+    CMP R6, R1
+    BGT mandelbrot_escape
+
+    SUB R7, R7, V1
+    CMP R7, V0
+    BEQ mandelbrot_inside
+
+    FSUB R4, R4, R5
+    FMUL R6, R2, R3
+    FADD R2, R4, R10
+    FADD R6, R6, R6
+    FADD R3, R6, R11
+    B mandelbrot_iter
+
+mandelbrot_escape:
+    MOV R4, [iter_limit]
+    SUB R7, R4, R7
+    LSL R7, R7, V4
+
+    SUB R6, R6, R1
+    LSR R5, R6, V11
+    CMP R5, V0
+    BNE escape_far
+
+    LSR R6, R6, V1
+    RSB R6, R6, V1024
+    B escape_shade
+
+escape_far:
+    SUB R6, R6, V2048
+    LSR R6, R6, V2
+    RSB R6, R6, V0
+
+escape_shade:
+    ASR R6, R6, V6
+    ADD R6, R6, R7
+    AND R6, R6, V(PAL_MASK)
+    ADD R6, R6, palette
+    MOV R5, [R6]
+    B mandelbrot_plot
+
+mandelbrot_inside:
+    MOV R5, V(INTERIOR)
+
+mandelbrot_plot:
+    PIXELNB R8, R9, R5
+    RSB R3, R9, MIRROR_Y
+    PIXELNB R8, R3, R5
+
+    FADD R14, R14, F1.0
+    ADD R8, R8, V1
+    CMP R8, SCREEN_W
+    BLT mandelbrot_pixel
+
+    ADD R9, R9, V1
+    CMP R9, HALF_H
+    BLT mandelbrot_row
+
+    POP {PC}
+
+mark_frame:
+    MOV R2, =CYCLES_HI
+    MOVM R3, [R2]
+    SAVEM R3, [frame_tick]
+    MOV PC, R14
+
+show_status:
+    MOV R2, =CYCLES_HI
+    MOVM R3, [R2]
+    MOVM R4, [frame_tick]
+    SUB R3, R3, R4
+    AND R3, R3, V255
+    LSL R3, R3, V8
+    MOV HEX, R3
+    MOV PC, R14
+
+gen_palette:
+    MOV R0, V0
+
+palette_loop:
+    LSR R1, R0, V3
+    AND R2, R0, V(PAL_SPAN - 1)
+
+    ADD R3, R1, anchor_r
+    MOV R4, [R3]
+    ADD R3, R3, V1
+    MOV R5, [R3]
+    SUB R5, R5, R4
+    MUL R5, R5, R2
+    ASR R5, R5, V3
+    ADD R4, R4, R5
+    ADD R4, R4, V16
+    MIN R4, R4, V255
+    LSR R4, R4, V5
+    LSL R6, R4, V5
+
+    ADD R3, R1, anchor_g
+    MOV R4, [R3]
+    ADD R3, R3, V1
+    MOV R5, [R3]
+    SUB R5, R5, R4
+    MUL R5, R5, R2
+    ASR R5, R5, V3
+    ADD R4, R4, R5
+    ADD R4, R4, V16
+    MIN R4, R4, V255
+    LSR R4, R4, V5
+    LSL R4, R4, V2
+    ORR R6, R6, R4
+
+    ADD R3, R1, anchor_b
+    MOV R4, [R3]
+    ADD R3, R3, V1
+    MOV R5, [R3]
+    SUB R5, R5, R4
+    MUL R5, R5, R2
+    ASR R5, R5, V3
+    ADD R4, R4, R5
+    ADD R4, R4, V32
+    MIN R4, R4, V255
+    LSR R4, R4, V6
+    ORR R6, R6, R4
+
+    ADD R5, R0, palette
+    SAVE R6, [R5]
+    ADD R0, R0, V1
+    CMP R0, PAL_SIZE
+    BLT palette_loop
+    MOV PC, R14
