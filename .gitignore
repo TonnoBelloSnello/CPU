@@ -4,6 +4,9 @@
 !*/
 !*.*
 
+# Extensionless, but a tracked source file rather than a build binary.
+!/LICENSE
+
 *.*.bak
 .vscode/
 __pycache__/
