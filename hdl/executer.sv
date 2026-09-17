@@ -270,14 +270,13 @@ module Executer
         input logic signed [ADDR_WIDTH-1:0] a,
         input logic signed [ADDR_WIDTH-1:0] b
     );
-        logic signed [QMUL_W-1:0] wa;
-        logic signed [QMUL_W-1:0] wb;
+        logic signed [(2*ADDR_WIDTH)-1:0] product;
         logic signed [QMUL_W-1:0] rounded;
         logic signed [SAT_W-1:0]  narrowed;
         begin
-            wa       = {{(QMUL_W-ADDR_WIDTH){a[ADDR_WIDTH-1]}}, a};
-            wb       = {{(QMUL_W-ADDR_WIDTH){b[ADDR_WIDTH-1]}}, b};
-            rounded  = ((wa * wb) <<< 1) + (QMUL_W'(1) <<< (ADDR_WIDTH - 1));
+            product  = a * b;
+            rounded  = ({{(QMUL_W-(2*ADDR_WIDTH)){product[(2*ADDR_WIDTH)-1]}}, product}
+                        <<< 1) + (QMUL_W'(1) <<< (ADDR_WIDTH - 1));
             narrowed = rounded >>> ADDR_WIDTH;
             qrdmulh  = saturate_wide(narrowed);
         end
@@ -319,6 +318,9 @@ module Executer
         end
     endfunction
 
+    localparam int DOT_SUM_WIDTH = 16 + NPU_LANE_SEL_WIDTH;
+    localparam int VEC_SUM_WIDTH = 8 + NPU_LANE_SEL_WIDTH;
+
     function automatic logic signed [31:0] vector_dot(
         input logic [NPU_VEC_WIDTH-1:0] va,
         input logic [NPU_VEC_WIDTH-1:0] vb
@@ -326,46 +328,49 @@ module Executer
         logic signed [7:0]  la;
         logic signed [7:0]  lb;
         logic signed [15:0] prod;
-        logic signed [31:0] sum;
+        logic signed [DOT_SUM_WIDTH-1:0] tree [0:NPU_LANES-1];
         begin
-            sum = 32'sd0;
             for (int l = 0; l < NPU_LANES; l++) begin
-                la   = va[l*8 +: 8];
-                lb   = vb[l*8 +: 8];
-                prod = la * lb;
-                sum  = sum + {{16{prod[15]}}, prod};
+                la      = va[l*8 +: 8];
+                lb      = vb[l*8 +: 8];
+                prod    = la * lb;
+                tree[l] = {{(DOT_SUM_WIDTH-16){prod[15]}}, prod};
             end
-            vector_dot = sum;
+            for (int span = NPU_LANES / 2; span > 0; span = span / 2)
+                for (int i = 0; i < span; i++)
+                    tree[i] = tree[i] + tree[i + span];
+            vector_dot = {{(32-DOT_SUM_WIDTH){tree[0][DOT_SUM_WIDTH-1]}}, tree[0]};
         end
     endfunction
 
     function automatic logic signed [31:0] vector_sum(
         input logic [NPU_VEC_WIDTH-1:0] va
     );
-        logic signed [7:0]  la;
-        logic signed [31:0] sum;
+        logic signed [7:0] la;
+        logic signed [VEC_SUM_WIDTH-1:0] tree [0:NPU_LANES-1];
         begin
-            sum = 32'sd0;
             for (int l = 0; l < NPU_LANES; l++) begin
-                la  = va[l*8 +: 8];
-                sum = sum + {{24{la[7]}}, la};
+                la      = va[l*8 +: 8];
+                tree[l] = {{(VEC_SUM_WIDTH-8){la[7]}}, la};
             end
-            vector_sum = sum;
+            for (int span = NPU_LANES / 2; span > 0; span = span / 2)
+                for (int i = 0; i < span; i++)
+                    tree[i] = tree[i] + tree[i + span];
+            vector_sum = {{(32-VEC_SUM_WIDTH){tree[0][VEC_SUM_WIDTH-1]}}, tree[0]};
         end
     endfunction
 
     function automatic logic signed [7:0] vector_max(
         input logic [NPU_VEC_WIDTH-1:0] va
     );
-        logic signed [7:0] la;
-        logic signed [7:0] best;
+        logic signed [7:0] tree [0:NPU_LANES-1];
         begin
-            best = va[7:0];
-            for (int l = 1; l < NPU_LANES; l++) begin
-                la = va[l*8 +: 8];
-                if (la > best) best = la;
-            end
-            vector_max = best;
+            for (int l = 0; l < NPU_LANES; l++)
+                tree[l] = va[l*8 +: 8];
+            for (int span = NPU_LANES / 2; span > 0; span = span / 2)
+                for (int i = 0; i < span; i++)
+                    if (tree[i + span] > tree[i]) tree[i] = tree[i + span];
+            vector_max = tree[0];
         end
     endfunction
 
@@ -373,11 +378,12 @@ module Executer
         input logic signed [31:0] value,
         input logic signed [15:0] multiplier
     );
+        logic signed [47:0] product;
         logic signed [48:0] scaled;
         begin
-            scaled = ({{17{value[31]}}, value} * {{33{multiplier[15]}}, multiplier})
-                     + 49'sd16384;
-            scaled = scaled >>> 15;
+            product = value * multiplier;
+            scaled  = {product[47], product} + 49'sd16384;
+            scaled  = scaled >>> 15;
             if (scaled > ACC_SAT_MAX)      acc_qmul = 32'sh7FFFFFFF;
             else if (scaled < ACC_SAT_MIN) acc_qmul = 32'sh80000000;
             else                           acc_qmul = scaled[31:0];

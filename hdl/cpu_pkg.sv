@@ -220,7 +220,8 @@ package cpu_pkg;
     localparam int MMIO_OFF_CYCLES_LO = 'h0C;
     localparam int MMIO_OFF_CYCLES_HI = 'h10;
 
-    localparam int CLOCK_FREQ_HZ = 50_000_000;
+
+    localparam int CLOCK_FREQ_HZ = 40_625_000;
     localparam int USE_SLOW_CLOCK = 0;
     localparam int SLOW_CLOCK_DIVISOR = 21;
 

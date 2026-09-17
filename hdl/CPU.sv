@@ -31,6 +31,7 @@ module CPU
 
     logic [SLOW_CLOCK_DIVISOR-1:0] clock_counter = '0;
     logic slow_clock = 1'b0;
+    wire core_clock;
     wire cpu_clock;
     wire core_reset;
 
@@ -44,7 +45,7 @@ module CPU
 
     generate
         if (USE_SLOW_CLOCK) begin : gen_slow_clock
-            always_ff @(posedge clock) begin
+            always_ff @(posedge core_clock) begin
                 clock_counter <= clock_counter + 1'b1;
                 if (clock_counter == '0) begin
                     slow_clock <= ~slow_clock;
@@ -52,7 +53,7 @@ module CPU
             end
             assign cpu_clock = slow_clock;
         end else begin : gen_fast_clock
-            assign cpu_clock = clock;
+            assign cpu_clock = core_clock;
         end
     endgenerate
 
@@ -435,12 +436,14 @@ module CPU
     assign core_reset = reset_sync[1];
 
     `ifdef SIMULATION
-        assign vga_clk   = clock;
+        assign vga_clk    = clock;
+        assign core_clock = clock;
         assign pll_locked = 1'b1;
     `else
         vga_pll pll_inst (
             .inclk0 (clock),
             .c0     (vga_clk),
+            .c1     (core_clock),
             .locked (pll_locked)
         );
     `endif

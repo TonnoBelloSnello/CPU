@@ -1,6 +1,7 @@
 module vga_pll (
     input  wire inclk0,  // 50 MHz board clock
     output wire c0,  // 65 MHz pixel clock
+    output wire c1,  // 40.625 MHz CPU core clock
     output wire locked
 );
 
@@ -8,6 +9,7 @@ module vga_pll (
     wire       sub_wire2;
 
     assign c0     = sub_wire0[0];
+    assign c1     = sub_wire0[1];
     assign locked = sub_wire2;
 
     altpll #(
@@ -16,6 +18,10 @@ module vga_pll (
         .clk0_duty_cycle         (50),
         .clk0_multiply_by        (13),
         .clk0_phase_shift        ("0"),
+        .clk1_divide_by          (16),
+        .clk1_duty_cycle         (50),
+        .clk1_multiply_by        (13),
+        .clk1_phase_shift        ("0"),
         .compensate_clock        ("CLK0"),
         .inclk0_input_frequency  (20000),
         .intended_device_family  ("Cyclone V"),
@@ -49,7 +55,7 @@ module vga_pll (
         .port_scanread           ("PORT_UNUSED"),
         .port_scanwrite          ("PORT_UNUSED"),
         .port_clk0               ("PORT_USED"),
-        .port_clk1               ("PORT_UNUSED"),
+        .port_clk1               ("PORT_USED"),
         .port_clk2               ("PORT_UNUSED"),
         .port_clk3               ("PORT_UNUSED"),
         .port_clk4               ("PORT_UNUSED"),

@@ -112,13 +112,27 @@ enough to reshape the processor:
 | Vector registers      | 8 × 64 bits (Q0–Q7)     | Eight INT8 lanes each; ``NPU_LANES``, ``NPU_VREGS`` |
 | Accumulators          | 4 × 32 bits (A0–A3)     | Signed; ``NPU_ACCS``                             |
 | Tensor window cache   | 512 × 9 bits            | ``NPU_PATCH_DEPTH`` in ``hdl/cpu_pkg.sv``; storage in ``hdl/npu.sv`` |
-| Clock                 | 50 MHz default          | Optional clock divider (``USE_SLOW_CLOCK``)      |
+| Clock                 | 40.625 MHz core         | PLL output from the 50 MHz board clock; optional divider (``USE_SLOW_CLOCK``) |
 
 ``RAM_ADDR_WIDTH`` is the one most worth knowing about if you ever want a
 bigger address space: it can be raised in ``hdl/cpu_pkg.sv`` to 20 bits
 (1 MB) or 24 bits (16 MB), though 24 bits means a considerably longer
 synthesis run and is only worth it if a program genuinely needs that much
 memory.
+
+The core does not run from the board's 50 MHz pin. That pin feeds the PLL
+in ``hdl/vga_pll.v``, whose 325 MHz VCO drives two outputs: 65 MHz for the
+VGA pixel clock and 40.625 MHz for the core. The reason is the execute
+stage below: reading the instruction word, selecting Operand2, shifting it
+and finishing the operation all happen in one clock period, and the
+accumulator paths need 22.3 ns of it, so a 20 ns period missed setup by
+2.3 ns. The two PLL outputs are declared asynchronous in
+``hdl/CPUFrFr.sdc``; the framebuffer is the only state both domains touch
+and it is a true dual-port RAM with one clock per port. If you shorten the
+execute stage and want the core faster, lower ``clk1_divide_by`` in the PLL
+and raise ``CLOCK_FREQ_HZ`` in ``hdl/cpu_pkg.sv`` to match: the VCO is fixed
+at 325 MHz, so the reachable rates are 325/N MHz, and ``CLOCK_FREQ_HZ`` is
+what ``WAIT`` counts milliseconds with.
 
 How an instruction actually gets executed
 ------------------------------------------
