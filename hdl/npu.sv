@@ -276,7 +276,7 @@ module NPU
                                               * {16'd0, out_c});
                     result     <= (mode == NPU_MODE_LUT) ? cfg_out_base : '0;
                     mem_raddr  <= cfg_in_base;
-                    state      <= (mode == NPU_MODE_LUT) ? N_LUT_WAIT : N_ARG_WAIT;
+                    state      <= npu_state_t'((mode == NPU_MODE_LUT) ? N_LUT_WAIT : N_ARG_WAIT);
                 end else if ((k_w == 16'd0) || (k_h == 16'd0)
                              || (mode_is_conv && (in_c == 16'd0))) begin
                     result <= ADDR_WIDTH'(NPU_ERR_SHAPE);
